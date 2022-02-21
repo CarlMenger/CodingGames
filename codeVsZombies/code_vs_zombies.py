@@ -49,33 +49,38 @@ class Zombie(Character):
         self.target_id: int = -1
         self.target_point: tuple = ()
         self.target_distance: float = float('inf')
-        self.interception_turns: float = -1
+        self.interception_turns: int = -1
         # self.set_target_vars()
 
     def set_target_vars(self):  # TODO: add new attrs
         global HUMANS
         target_distance = float('inf')
-        # find closest target
+        # find closest target # TODO: not working
         for h in HUMANS:
             human_distance = distance(h.point, self.point)
-            if human_distance <= target_distance: # find closer target
+            if human_distance < target_distance:  # find closer target
                 self.target_id = h.id
-                target_distance = distance(h.point, self.point)
+                self.target_point = h.point
+                target_distance = human_distance
+
         # calc all other attrs
-        self.point_next = self.get_point_next
-        self.target_point = h.point
+        self.point_next = self.get_point_next()
         self.target_distance = target_distance
-        self.interception_turns = (target_distance // 400 ) + 1
+        print('self.target_distance: ', self.target_distance, file=sys.stderr)
+        self.interception_turns = int(target_distance // 400) + 1
+
         # self.interception_point =
-        #self.player_interception =
+        # self.player_interception =
 
     def get_point_next(self):
-        x0,y0 = self.point
-        x1,y1 = self.target_point
-        gradient = (y1-y0)/(x1-x0)
-        point0 = x0 + 400 / math.sqrt((1+gradient**2))
-        point1 = x0 - 400 / math.sqrt((1+gradient**2))
-        return (point0,point1)
+        x0, y0 = self.point
+        x1, y1 = self.target_point
+        gradient = (y1 - y0) / (x1 - x0)
+        point0 = x0 + 400 / math.sqrt((1 + gradient ** 2))
+        point1 = x0 - 400 / math.sqrt((1 + gradient ** 2))
+        assert isinstance(point0, float) and isinstance(point1, float), 'Wrong format in get_point_next() method'
+        return (point0, point1)
+
 
 def init_round_inputs():
     """ keep 2 lists of objects, keep player as last id/position human"""
@@ -108,42 +113,60 @@ def go_to(_from: tuple,
 def get_human(id: int) -> Human:
     global HUMANS
     out = [h for h in HUMANS if h.id == id]
-    print("out",out, file=sys.stderr, flush=True)
-    assert len(out)>0, f'Human with ID: {id} not found!'
+    assert len(out) > 0, f'Human with ID: {id} not found!'
     return out[0]
 
 
 def go_to_human(id: int):
-    player = get_human(len(HUMANS)-1)
+    player = get_human(len(HUMANS) - 1)
     return go_to(player.point, HUMANS[id].point)
 
-def recalculate_zombies()->None:
-    global ZOMBIES
-    for z in ZOMBIES: z.set_target_vars()
 
-def get_mandatory_points():
-    return [z.point_next for z in ZOMBIES if z.interception_turns <= 1.0]
+# def recalculate_zombies() -> None:
+#     global ZOMBIES
+#     for z in ZOMBIES: z.set_target_vars()
 
 
-def get_circles_intersection(point_a, point_b, range_0, range_1):
-    # circle 1: (x0, y0), radius r0
-    # circle 2: (x1, y1), radius r1
-    distance = (math.dist(point_a, point_b))
-    x0,y0 = point_a
+# def get_t0_points():
+#     return [z.point_next for z in ZOMBIES if z.interception_turns <= 1]
+#
+#
+# def get_t1_points():
+#     return [z.point_next for z in ZOMBIES if 1.0 <= z.interception_turns <= 2]
+
+
+def get_priority_list():
+    return_list = []
+    inception_turns = [z.interception_turns for z in ZOMBIES]  # list index == zombie id
+    priority_list = [[] for _ in range(max(inception_turns)+1)]  # list index == turn_num; val == list[zombies_id]\
+    for zombie_id, turn in enumerate(inception_turns):
+        priority_list[turn].append(zombie_id)  # 0 index here == turn 1?
+    print(inception_turns, " <- inception_turns ", file=sys.stderr)
+    print(priority_list, " <- priority_list ", file=sys.stderr)
+    return priority_list
+
+def get_circles_intersection(point_a: tuple, range_a, point_b: tuple, range_b):
+    # print('gci input points:', point_a, point_b, file=sys.stderr)
+    distance = math.dist(point_a, point_b)
+    x0, y0 = point_a
     x1, y1 = point_b
-    if distance > range_0 + range_1: # no intersection
-        return None
-    elif distance > range_0 + range_1: # 1 intersection
-        pass
+    if distance > range_a + range_b:  # no intersection
+        print("Intersection: No intersection", file=sys.stderr)
+        return None, None
+    elif distance == range_a + range_b:  # 1 intersection
+        print("Intersection: 1 intersection", file=sys.stderr)
+        return None, None
     # One circle within other
-    elif distance < abs(range_0-range_1):
-        return None
+    elif distance < abs(range_a - range_b):
+        print("Intersection: One circle within other", file=sys.stderr)
+        return None, None
     # coincident circles
-    if distance == 0 and range_0 == range_1:
-        return None
-    else: # 2 intersections
-        a = (range_0 ** 2 - range_1 ** 2 + distance ** 2) / (2 * distance)
-        h = math.sqrt(range_0 ** 2 - a ** 2)
+    if distance == 0 and range_a == range_b:
+        print("Intersection: Coincident circles", file=sys.stderr)
+        return None, None
+    else:  # 2 intersections
+        a = (range_a ** 2 - range_b ** 2 + distance ** 2) / (2 * distance)
+        h = math.sqrt(range_a ** 2 - a ** 2)
         x2 = x0 + a * (x1 - x0) / distance
         y2 = y0 + a * (y1 - y0) / distance
         x3 = x2 + h * (y1 - y0) / distance
@@ -153,17 +176,23 @@ def get_circles_intersection(point_a, point_b, range_0, range_1):
 
         return (x3, y3), (x4, y4)
 
+
 # game loop
 while True:
     HUMANS, ZOMBIES = init_round_inputs()
-    # print("humans after init",humans[0].id, file=sys.stderr, flush=True)
-    # print(humans)
-    mandatory_points = get_mandatory_points()
+    for z in ZOMBIES: z.set_target_vars()
+    # default
+    order = go_to_human(0)
+    # print('t0_points: ', t0_points, file=sys.stderr)
+    # print('t0_points: ', t1_points, file=sys.stderr)
+    priority_list = get_priority_list()
     if len(HUMANS) == 1:
         order = go_to_human(HUMANS[0].id)
 
-    # default
-
-    order = go_to_human(0)
-    # print(f'{order}')
     print(*order)
+
+# TODO: make intersections use list
+# TODO: func in this circle & as close as possible to a point func(point_a,point_a_range, point_b)
+# TODO: list of points in priority to cover
+# TODO, sorted list of inception turns and use that for point selection
+# TODO: can_be_saved - func () -> bool:
