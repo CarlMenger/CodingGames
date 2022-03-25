@@ -1,0 +1,5 @@
+1. Gene scoring should be based on more than "Game score", initial generations will have 0 "Game score"
+	- avg distance to humans / zombies to sort population
+2. player.next_move should not be random 
+	- avg distance to humans / zombies ?
+	- total traveled distance should be Normal? Ii moving more better? Depends on if he kills on arrival or kills everything in its path 

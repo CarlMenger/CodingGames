@@ -1,5 +1,7 @@
 import math
 
+from typing import List
+
 KILL_MODIFIER = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987]
 PLAYER_RANGE = 2000
 ZOMBIE_RANGE = 400
@@ -9,10 +11,13 @@ class GameState:
     __slots__ = ('player', 'humans', 'zombies', 'score')
 
     def __init__(self, player, humans, zombies, score):
-        self.player = player
-        self.humans = humans
-        self.zombies = zombies
-        self.score = score
+        self.player: Player = player
+        self.humans: List[Character] = humans
+        self.zombies: List[Zombie] = zombies
+        self.score: int = score
+
+    def __repr__(self):
+        return f'Humans: {len(self.humans)}, Zombies: {len(self.zombies)}, Score: {self.score}'
 
     def update_game_state(self):
         # player should  have player.point_next
@@ -27,8 +32,9 @@ class GameState:
         self.player_move()
         self.player_kill()
         self.zombies_kill()
-        
+
         self.update_score()
+        self.remove_dead_zombies()
 
     def player_move(self):
         self.player.point = self.player.point_next
@@ -46,10 +52,14 @@ class GameState:
         # TODO:  find new point
 
     def zombies_kill(self):
+        assert self.zombies and self.humans, 'No zombies alive or no humans alive!'
         for zombie in self.zombies:
-            for human in self.humans:
-                if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
-                    human.alive = False
+            if zombie.alive:
+                for human in self.humans:
+                    assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
+                    print(zombie.point, human.point)
+                    if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
+                        human.alive = False
 
     def update_score(self):
         humans_alive = len([human for human in self.humans if human.alive == True])
@@ -88,6 +98,9 @@ class Player(Character):
     def __init__(self: super, id: int, point: tuple, point_next: tuple):
         super().__init__(id, point, point_next)
 
+    def set_next_move(self, next_move: tuple):
+        self.point_next = next_move
+
 
 class Zombie(Character):
     _slots_ = (
@@ -121,6 +134,5 @@ class Zombie(Character):
         point1 = x0 - 400 / math.sqrt((1 + gradient ** 2))
         assert isinstance(point0, float) and isinstance(point1, float), 'Wrong format in get_point_next() method'
         self.point_next = tuple([point0, point1])
-
 
 # ZOMBIE find_target will be outside of class Zombie, Zombie only sets updated vars using set_target method

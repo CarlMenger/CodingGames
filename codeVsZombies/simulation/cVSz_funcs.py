@@ -1,4 +1,6 @@
+import copy
 import math
+import random
 
 from functools import wraps
 import time
@@ -19,12 +21,13 @@ def timeit(my_func):
     return timed
 
 
-def init_round_inputs_offline():
+def load_init_data_online():
     """ keep 2 lists of objects, keep player as last id/position human"""
     humans = []
     zombies = []
-    x, y = [int(i) for i in input().split()]
+    player_x, player_y = [int(i) for i in input().split()]
     human_count = int(input())
+    player = Player(0, (player_x, player_y), (0, 0))
     for i in range(human_count):
         human_id, human_x, human_y = [int(j) for j in input().split()]
         humans.append(Character(human_id, (human_x, human_y), (0, 0)))
@@ -32,24 +35,39 @@ def init_round_inputs_offline():
     for i in range(zombie_count):
         zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = [int(j) for j in input().split()]
         zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
-    humans.append(Character(human_count, x, y))  # add player at the end
-    return humans, zombies
+    return player, humans, zombies
 
 
-@timeit
-def load_offline_data():
+# @timeit
+def load_init_data_offline():
     humans = []
     zombies = []
     with open(path, 'r+') as data:
         x, y = map(int, data.readline().split())
-        player = Player(0, x, y)
+        player = Player(0, (x, y), (x, y))
         human_count = int(data.readline())
         for i in range(human_count):
             human_id, human_x, human_y = map(int, data.readline().split())
-            humans.append(Character(human_id, human_x, human_y))
+            humans.append(Character(human_id, (human_x, human_y), (human_x, human_y)))
         zombie_count = int(data.readline())
         for i in range(zombie_count):
             zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = map(int, data.readline().split())
             zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
     return player, humans, zombies
 
+
+@timeit
+def base_population_generation(player, humans, zombies):
+    population = []
+    for i in range(1000):
+        population.append(GameState(player, humans, zombies, 0))
+    for gs in population:
+        move = (random.randint(0, 16000), random.randint(0, 9000))
+        gs.player.set_next_move(move)
+    return population
+
+@timeit
+def simulate_turn(population:List[GameState]):
+    for game_state in population:
+        game_state.update_game_state()
+    return population
