@@ -20,19 +20,18 @@ class GameState:
         return f'Humans: {len(self.humans)}, Zombies: {len(self.zombies)}, Score: {self.score}'
 
     def update_game_state(self):
-        # player should  have player.point_next
-        # move zombies
-        # move player
-        # player kills during movement
-        # zombies kill
-        # find next point for zombies?
-        # update score
-
+        # Moving
         self.zombies_move()
         self.player_move()
-        self.player_kill()
-        self.zombies_kill()
 
+        # Killing
+        self.player_kill()
+        self.is_game_over()
+        self.zombies_kill()
+        self.is_game_over()
+
+        # Recalculating
+        self.zombies_find_next_target()  # zombies can be init with no next target
         self.update_score()
         self.remove_dead_zombies()
 
@@ -51,32 +50,69 @@ class GameState:
             zombie.point = zombie.point_next
         # TODO:  find new point
 
+    def zombies_find_next_target(self):
+        # check if zombie is alive --> move all zombie funcs after zombie is alive condition
+        # check if previous target is valid, if so calc next move
+        for zombie in self.get_alive_zombies():
+            assert zombie is not None, 'Unlive zombie looking for target!'
+            # check target status from last round
+            target = self.get_human(zombie.target_id)
+            # valid target (not killed this or previous rounds)
+            if target is None or not target.alive:
+                target = self.find_nearest_human(zombie)
+                assert isinstance(target, Character), 'Wrong/No target found for zombie!'
+            zombie.set_point_next(target.point)  # set next move
+
     def zombies_kill(self):
         assert self.zombies and self.humans, 'No zombies alive or no humans alive!'
-        for zombie in self.zombies:
-            if zombie.alive:
-                for human in self.humans:
-                    assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
-                    print(zombie.point, human.point)
-                    if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
-                        human.alive = False
+        for zombie in self.get_alive_zombies():
+            for human in self.humans:
+                assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
+                if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
+                    human.alive = False
 
     def update_score(self):
-        humans_alive = len([human for human in self.humans if human.alive == True])
-        zombies_dead = len([zombie for zombie in self.zombies if zombie.alive == False])
-        # zombies_alive = len([zombie for zombie in self.zombies if zombie.alive == True])
-        if humans_alive == 0:
-            self.score = 0
-        elif zombies_dead == len(self.zombies):  # TODO: feels bug prone
-            pass  # TODO: way to end the calc
-        else:
-            self.score += (math.sqrt(humans_alive) * 10) * (KILL_MODIFIER[zombies_dead] + 2 + 1)
-            # +1 to compensate index
+        humans_alive_cnt = len(self.get_alive_humans())
+        zombies_dead_cnt = len([zombie for zombie in self.zombies if not zombie.alive])
+        self.score += (math.sqrt(humans_alive_cnt) * 10) * (KILL_MODIFIER[zombies_dead_cnt] + 2 + 1)
 
     def remove_dead_zombies(self):
         for zombie in self.zombies:
             if not zombie.alive:
                 del zombie
+
+    def get_human(self, id):
+        for human in self.humans:
+            if human.id == id:
+                return human
+
+    def find_nearest_human(self, zombie):
+        assert zombie.alive, 'Non-alive zombie looking for target'
+        dist_min = 99999
+        h = None
+        for human in self.get_alive_humans():
+            dist = math.dist(zombie.point, human.point)
+            if dist < dist_min:
+                dist_min = dist
+                h = human
+        return h
+
+    def get_alive_zombies(self):
+        return [zombie for zombie in self.zombies if zombie.alive]
+
+    def get_alive_humans(self):
+        return [human for human in self.humans if human.alive]
+
+    def is_game_over(self):
+        if not self.get_alive_humans():
+            print('Game Over: Loss')
+            print(f'{self}')
+            quit()
+        elif not self.get_alive_zombies():
+            print('Game Over: Win')
+            print(f'{self}')
+            quit()
+        return False
 
 
 class Character:
@@ -89,7 +125,7 @@ class Character:
         self.alive = True
 
     def __str__(self) -> str:
-        return f'I am f{self.id} at: {self.point[0]}, {self.point[1]}'
+        return f'{type(self)}, ID: {self.id} at: {self.point[0]}, {self.point[1]}'
 
 
 class Player(Character):
@@ -118,16 +154,16 @@ class Zombie(Character):
         self.target_distance: float = float('inf')
         self.interception_turns: int = -1
 
-    def set_target(self, target_id, target_point, target_distance, interception_turns):
-        self.target_id: int = target_id
-        self.target_point: tuple = target_point
-        self.target_distance: float = target_distance
-        self.interception_turns: int = interception_turns
-        self.find_point_next(self.point, self.target_point)
+    # def set_target(self, target_id, target_point, target_distance, interception_turns):
+    #     self.target_id: int = target_id
+    #     self.target_point: tuple = target_point
+    #     self.target_distance: float = target_distance
+    #     self.interception_turns: int = interception_turns
+    #     self.find_point_next(self.target_point)
 
-    def find_point_next(self, point, target_point):
+    def set_point_next(self, target_point):
         # TODO: limit so to not overshoot the target?
-        x0, y0 = point
+        x0, y0 = self.point
         x1, y1 = target_point
         gradient = (y1 - y0) / (x1 - x0)
         point0 = x0 + 400 / math.sqrt((1 + gradient ** 2))
