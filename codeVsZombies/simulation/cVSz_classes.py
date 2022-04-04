@@ -8,26 +8,44 @@ ZOMBIE_RANGE = 400
 
 
 class GameState:
-    __slots__ = ('player', 'humans', 'zombies', 'score')
+    __slots__ = ('id', 'player', 'humans', 'zombies', 'score')
 
-    def __init__(self, player, humans, zombies, score):
+    def __init__(self, id, player, humans, zombies, score):
+        self.id = id
         self.player: Player = player
         self.humans: List[Character] = humans
         self.zombies: List[Zombie] = zombies
         self.score: int = score
 
     def __repr__(self):
-        return f'Humans: {len(self.humans)}, Zombies: {len(self.zombies)}, Score: {self.score}'
+        return f'Humans: {len(self.get_alive_humans())}/{len(self.humans)}, ' \
+               f'Zombies: {len(self.get_alive_zombies())}/{len(self.zombies)},' \
+               f'Score: {self.score}'
+
+    def debug(self):
+        # TODO: dist matrix zombies to player+humans
+        print("{:<8} {:<10} {:<12}".format('ZOMBIE', 'CHARACTER', 'DISTANCE'))
+        for zombie in self.get_alive_zombies():
+            for human in self.get_alive_humans() + [self.player]:
+                print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
+
+    # TEST FUNC
+    def test_zombie_points(self,num):
+        print(f'*** {num} ***')
+        for h in self.zombies:
+            print(h.point)
 
     def update_game_state(self):
         # Moving
-        self.zombies_move()
+        self.test_zombie_points(1)
+        self.zombies_move2next_point()
+        self.test_zombie_points(2)
         self.player_move()
 
         # Killing
         self.player_kill()
         self.is_game_over()
-        self.zombies_kill()
+        self.zombies_kill()  # humans.point changed
         self.is_game_over()
 
         # Recalculating
@@ -39,28 +57,29 @@ class GameState:
         self.player.point = self.player.point_next
         # TODO: after this, no new point_next is set
 
+    def set_player_next_move(self, next_point: tuple) -> None:
+        self.player.point_next = next_point
+
     # FIXME: kill everything in path, not just on arrival?
     def player_kill(self):
         for zombie in self.zombies:
             if math.dist(self.player.point, zombie.point) <= PLAYER_RANGE:
+                print(f'Player kills Human {zombie.id}')
                 zombie.alive = False
 
-    def zombies_move(self):
+    def zombies_move2next_point(self):
+        # FIXME: they should go 400 in distance, not teleport to target
         for zombie in self.zombies:
-            zombie.point = zombie.point_next
-        # TODO:  find new point
+            zombie.set_point_next(zombie.point_next)
 
     def zombies_find_next_target(self):
         # check if zombie is alive --> move all zombie funcs after zombie is alive condition
-        # check if previous target is valid, if so calc next move
+        # need to recheck target validity each turn, player moving around might change it
         for zombie in self.get_alive_zombies():
             assert zombie is not None, 'Unlive zombie looking for target!'
-            # check target status from last round
-            target = self.get_human(zombie.target_id)
-            # valid target (not killed this or previous rounds)
-            if target is None or not target.alive:
-                target = self.find_nearest_human(zombie)
-                assert isinstance(target, Character), 'Wrong/No target found for zombie!'
+            # check target status from last round (not killed this or previous rounds)
+            target = self.find_nearest_character(zombie)
+            assert isinstance(target, Character), 'Wrong/No target found for zombie!'
             zombie.set_point_next(target.point)  # set next move
 
     def zombies_kill(self):
@@ -69,6 +88,7 @@ class GameState:
             for human in self.humans:
                 assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
                 if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
+                    print(f'Zombie {zombie.id} kills Human {human.id}')
                     human.alive = False
 
     def update_score(self):
@@ -86,11 +106,11 @@ class GameState:
             if human.id == id:
                 return human
 
-    def find_nearest_human(self, zombie):
+    def find_nearest_character(self, zombie):
         assert zombie.alive, 'Non-alive zombie looking for target'
         dist_min = 99999
         h = None
-        for human in self.get_alive_humans():
+        for human in self.get_alive_humans() + [self.player]:
             dist = math.dist(zombie.point, human.point)
             if dist < dist_min:
                 dist_min = dist
@@ -107,11 +127,11 @@ class GameState:
         if not self.get_alive_humans():
             print('Game Over: Loss')
             print(f'{self}')
-            quit()
+            # quit()
         elif not self.get_alive_zombies():
             print('Game Over: Win')
             print(f'{self}')
-            quit()
+            # quit()
         return False
 
 
