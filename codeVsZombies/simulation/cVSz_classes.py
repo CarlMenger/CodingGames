@@ -30,16 +30,20 @@ class GameState:
                 print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
 
     # TEST FUNC
-    def test_zombie_points(self,num):
+    def test_zombie_points(self, num):
         print(f'*** {num} ***')
-        for h in self.zombies:
-            print(h.point)
+        for z in self.zombies:
+            dist_change = math.dist(z.point, z.point_next)
+            print(f'Zombie {z.id} point: {z.point}')
+            print(f'Zombie {z.id} point_next (next move): {z.point_next}; + {dist_change}')
+            print(f'Zombie {z.id} target_point: {z.target_point}')
 
     def update_game_state(self):
         # Moving
-        self.test_zombie_points(1)
+        self.zombies_find_next_target()  # zombies can be init with no next target
+        self.test_zombie_points("Before moving")
         self.zombies_move2next_point()
-        self.test_zombie_points(2)
+        self.test_zombie_points("After moving")
         self.player_move()
 
         # Killing
@@ -49,13 +53,11 @@ class GameState:
         self.is_game_over()
 
         # Recalculating
-        self.zombies_find_next_target()  # zombies can be init with no next target
         self.update_score()
         self.remove_dead_zombies()
 
     def player_move(self):
-        self.player.point = self.player.point_next
-        # TODO: after this, no new point_next is set
+        self.player.point_next = self.get_point_next(self.player.point, self.player.point_next, 'p')
 
     def set_player_next_move(self, next_point: tuple) -> None:
         self.player.point_next = next_point
@@ -70,7 +72,7 @@ class GameState:
     def zombies_move2next_point(self):
         # FIXME: they should go 400 in distance, not teleport to target
         for zombie in self.zombies:
-            zombie.set_point_next(zombie.point_next)
+            zombie.point_next = self.get_point_next(zombie.point, zombie.target_point)
 
     def zombies_find_next_target(self):
         # check if zombie is alive --> move all zombie funcs after zombie is alive condition
@@ -80,7 +82,7 @@ class GameState:
             # check target status from last round (not killed this or previous rounds)
             target = self.find_nearest_character(zombie)
             assert isinstance(target, Character), 'Wrong/No target found for zombie!'
-            zombie.set_point_next(target.point)  # set next move
+            zombie.target_point = target.point
 
     def zombies_kill(self):
         assert self.zombies and self.humans, 'No zombies alive or no humans alive!'
@@ -134,6 +136,21 @@ class GameState:
             # quit()
         return False
 
+    def get_point_next(self, source_point: tuple, target_point: tuple, char='Z') -> tuple:
+        # TODO: limit so to not overshoot the target?
+        range = [PLAYER_RANGE, ZOMBIE_RANGE][char == 'z']
+        x0, y0 = source_point
+        x1, y1 = target_point
+        if x1 == x0:
+            gradient = 0
+        else:
+            gradient = (y1 - y0) / (x1 - x0)
+        point0 = x0 + range / math.sqrt((1 + gradient ** 2))
+        point1 = x0 - range / math.sqrt((1 + gradient ** 2))
+        assert isinstance(point0, float) and isinstance(point1, float), 'Wrong format in get_point_next() method'
+        print(f'get_point_next calculated move of {math.dist(source_point,(point0, point1))} units!')
+        return tuple([point0, point1])
+
 
 class Character:
     _slots_ = ('id', 'point', 'point_next', 'alive')
@@ -173,22 +190,5 @@ class Zombie(Character):
         self.target_point: tuple = ()
         self.target_distance: float = float('inf')
         self.interception_turns: int = -1
-
-    # def set_target(self, target_id, target_point, target_distance, interception_turns):
-    #     self.target_id: int = target_id
-    #     self.target_point: tuple = target_point
-    #     self.target_distance: float = target_distance
-    #     self.interception_turns: int = interception_turns
-    #     self.find_point_next(self.target_point)
-
-    def set_point_next(self, target_point):
-        # TODO: limit so to not overshoot the target?
-        x0, y0 = self.point
-        x1, y1 = target_point
-        gradient = (y1 - y0) / (x1 - x0)
-        point0 = x0 + 400 / math.sqrt((1 + gradient ** 2))
-        point1 = x0 - 400 / math.sqrt((1 + gradient ** 2))
-        assert isinstance(point0, float) and isinstance(point1, float), 'Wrong format in get_point_next() method'
-        self.point_next = tuple([point0, point1])
 
 # ZOMBIE find_target will be outside of class Zombie, Zombie only sets updated vars using set_target method
