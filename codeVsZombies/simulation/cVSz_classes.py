@@ -31,6 +31,7 @@ class GameState:
 
     # TEST FUNC
     def test_zombie_points(self, num):
+        print('')
         print(f'*** {num} ***')
         for z in self.zombies:
             dist_change = math.dist(z.point, z.point_next)
@@ -136,20 +137,20 @@ class GameState:
             # quit()
         return False
 
-    def get_point_next(self, source_point: tuple, target_point: tuple, char='Z') -> tuple:
-        # TODO: limit so to not overshoot the target?
+    def get_point_next(self, source_point: tuple, target_point: tuple, char='z') -> tuple:
+        x1, y1 = source_point
+        x2, y2 = target_point
         range = [PLAYER_RANGE, ZOMBIE_RANGE][char == 'z']
-        x0, y0 = source_point
-        x1, y1 = target_point
-        if x1 == x0:
-            gradient = 0
-        else:
-            gradient = (y1 - y0) / (x1 - x0)
-        point0 = x0 + range / math.sqrt((1 + gradient ** 2))
-        point1 = x0 - range / math.sqrt((1 + gradient ** 2))
-        assert isinstance(point0, float) and isinstance(point1, float), 'Wrong format in get_point_next() method'
-        print(f'get_point_next calculated move of {math.dist(source_point,(point0, point1))} units!')
-        return tuple([point0, point1])
+        if range > math.dist(source_point, target_point):  # Prevent overshooting
+            return target_point
+        distance = math.dist(source_point, target_point)
+        print(distance)
+        r = range / distance  # segment ratio
+
+        x3 = r * x2 + (1 - r) * x1  # find point that divides the segment
+        y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
+
+        return tuple([x3, y3])
 
 
 class Character:

@@ -11,7 +11,7 @@ import timeit
 #     gs.debug()
 population = [load_init_data_offline()]
 c = 0
-while c < 5000:
+while c < 3:
     print(f'Turn {c}')
     move = (random.randint(0, 16000), random.randint(0, 9000))
     population[0].player.set_next_move(move)
