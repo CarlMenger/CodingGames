@@ -8,19 +8,22 @@ ZOMBIE_RANGE = 400
 
 
 class GameState:
-    __slots__ = ('id', 'player', 'humans', 'zombies', 'score')
+    __slots__ = ('id', 'player', 'humans', 'zombies', 'score', 'score_decision', 'turn')
 
-    def __init__(self, id, player, humans, zombies, score):
+    def __init__(self, id, player, humans, zombies, turn):
         self.id = id
         self.player: Player = player
         self.humans: List[Character] = humans
         self.zombies: List[Zombie] = zombies
-        self.score: int = score
+        self.score: int = 0
+        self.score_decision: float = 0
+        self.turn: int = turn
 
     def __repr__(self):
         return f'Humans: {len(self.get_alive_humans())}/{len(self.humans)}, ' \
                f'Zombies: {len(self.get_alive_zombies())}/{len(self.zombies)},' \
-               f'Score: {self.score}'
+               f'Score: {self.score},' \
+               f'Turn: {self.turn}'
 
     def debug(self):
         # TODO: dist matrix zombies to player+humans
@@ -32,20 +35,21 @@ class GameState:
     # TEST FUNC
     def test_zombie_points(self, num):
         print('')
-        print(f'*** {num} ***')
         for z in self.zombies:
             dist_change = math.dist(z.point, z.point_next)
-            print(f'Zombie {z.id} point: {z.point}')
-            print(f'Zombie {z.id} point_next (next move): {z.point_next}; + {dist_change}')
-            print(f'Zombie {z.id} target_point: {z.target_point}')
+            dist2target = math.dist(z.point, z.target_point)
+            print(f'--- Zombie {z.id} --- ')
+            print(f'{z.point} --> {z.point_next}; target/id: {z.target_point}/{z.target_id} ++ {round(dist_change)}')
+            print(f'Dist {dist2target} ({round(dist2target/400,2)})')
+            print('')
 
+    # **************************************************************************************************************
     def update_game_state(self):
         # Moving
         self.zombies_find_next_target()  # zombies can be init with no next target
-        self.test_zombie_points("Before moving")
+        self.test_zombie_points(f" Turn {self.turn}")
         self.zombies_move2next_point()
-        self.test_zombie_points("After moving")
-        self.player_move()
+        self.player_move2next_point()
 
         # Killing
         self.player_kill()
@@ -57,33 +61,52 @@ class GameState:
         self.update_score()
         self.remove_dead_zombies()
 
-    def player_move(self):
+    # MOVEMENT
+    def player_move2next_point(self):
+        self.player.move_history.append(self.player.point)  # Save current point
         self.player.point_next = self.get_point_next(self.player.point, self.player.point_next, 'p')
+        self.player.point = self.player.point_next
 
     def set_player_next_move(self, next_point: tuple) -> None:
         self.player.point_next = next_point
 
     # FIXME: kill everything in path, not just on arrival?
-    def player_kill(self):
-        for zombie in self.zombies:
-            if math.dist(self.player.point, zombie.point) <= PLAYER_RANGE:
-                print(f'Player kills Human {zombie.id}')
-                zombie.alive = False
-
-    def zombies_move2next_point(self):
-        # FIXME: they should go 400 in distance, not teleport to target
-        for zombie in self.zombies:
-            zombie.point_next = self.get_point_next(zombie.point, zombie.target_point)
-
     def zombies_find_next_target(self):
         # check if zombie is alive --> move all zombie funcs after zombie is alive condition
         # need to recheck target validity each turn, player moving around might change it
         for zombie in self.get_alive_zombies():
             assert zombie is not None, 'Unlive zombie looking for target!'
             # check target status from last round (not killed this or previous rounds)
-            target = self.find_nearest_character(zombie)
+            target = self.find_nearest_character(zombie)  # Find target
             assert isinstance(target, Character), 'Wrong/No target found for zombie!'
-            zombie.target_point = target.point
+            zombie.target_point = target.point  #
+            zombie.target_id = target.id
+            zombie.point_next = self.get_point_next(zombie.point, zombie.target_point)  # Set path to target
+
+    def zombies_move2next_point(self):
+        for zombie in self.zombies:
+            zombie.move_history.append(zombie.point)  # Save current point
+            zombie.point = zombie.point_next  # Current point = Next point
+
+    def get_point_next(self, source_point: tuple, target_point: tuple, char='z') -> tuple:
+        x1, y1 = source_point
+        x2, y2 = target_point
+        range = [PLAYER_RANGE, ZOMBIE_RANGE][char == 'z']
+        if range > math.dist(source_point, target_point):  # Prevent overshooting
+            return target_point
+        distance = math.dist(source_point, target_point)
+        r = range / distance  # segment ratio
+
+        x3 = r * x2 + (1 - r) * x1  # find point that divides the segment
+        y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
+        return tuple(map(round, [x3, y3]))  # FIXME: rounding might cause slight overshooting (400.4122875237472)
+
+    # KILLING
+    def player_kill(self):
+        for zombie in self.zombies:
+            if math.dist(self.player.point, zombie.point) <= PLAYER_RANGE:
+                print(f'Player kills Zombie {zombie.id}')
+                zombie.alive = False
 
     def zombies_kill(self):
         assert self.zombies and self.humans, 'No zombies alive or no humans alive!'
@@ -137,29 +160,15 @@ class GameState:
             # quit()
         return False
 
-    def get_point_next(self, source_point: tuple, target_point: tuple, char='z') -> tuple:
-        x1, y1 = source_point
-        x2, y2 = target_point
-        range = [PLAYER_RANGE, ZOMBIE_RANGE][char == 'z']
-        if range > math.dist(source_point, target_point):  # Prevent overshooting
-            return target_point
-        distance = math.dist(source_point, target_point)
-        print(distance)
-        r = range / distance  # segment ratio
-
-        x3 = r * x2 + (1 - r) * x1  # find point that divides the segment
-        y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
-
-        return tuple([x3, y3])
-
 
 class Character:
-    _slots_ = ('id', 'point', 'point_next', 'alive')
+    _slots_ = ('id', 'point', 'point_next', 'move_history', 'alive')
 
     def __init__(self, id: int, point: tuple, point_next: tuple):
         self.id: int = id
         self.point: tuple = point
         self.point_next: tuple = point_next
+        self.move_history: List[tuple] = []
         self.alive = True
 
     def __str__(self) -> str:
@@ -167,7 +176,7 @@ class Character:
 
 
 class Player(Character):
-    # _slots_ = ('id', 'point', 'point_next',)
+    # _slots_ = ('move_history',)
 
     def __init__(self: super, id: int, point: tuple, point_next: tuple):
         super().__init__(id, point, point_next)
@@ -187,9 +196,9 @@ class Zombie(Character):
 
     def __init__(self, id: int, point: tuple, point_next: tuple):
         super().__init__(id, point, point_next)
-        self.target_id: int = -1
+        self.target_id: int = -1  # FIXME: useful?
         self.target_point: tuple = ()
-        self.target_distance: float = float('inf')
-        self.interception_turns: int = -1
+        self.target_distance: float = float('inf')  # FIXME: useful?
+        self.interception_turns: int = -1  # FIXME: useful?
 
-# ZOMBIE find_target will be outside of class Zombie, Zombie only sets updated vars using set_target method
+# TODO: why keep point_next for player? Its generated externally and just inputted
