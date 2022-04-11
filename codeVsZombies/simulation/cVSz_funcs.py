@@ -1,10 +1,9 @@
-import copy
-import math
 import random
-
-from functools import wraps
 import time
-from cVSz_classes import *
+from functools import wraps
+from typing import List
+
+from cVSz_classes import GameState, Player, Character, Zombie
 
 path = 'D:/__CodingGames/coding_games/codeVsZombies/simulation/input.txt'
 
@@ -39,7 +38,7 @@ def load_init_data_online() -> GameState:
 
 
 @timeit
-def load_init_data_offline() -> GameState:
+def load_init_data_offline():
     humans = []
     zombies = []
     with open(path, 'r+') as data:
@@ -53,14 +52,14 @@ def load_init_data_offline() -> GameState:
         for i in range(zombie_count):
             zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = map(int, data.readline().split())
             zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
-    return GameState(0, player, humans, zombies, 0)
+    return player, humans, zombies
 
 
 @timeit
-def base_population_generation(player, humans, zombies) -> List[GameState]:
+def generate_base_population(player, humans, zombies, count: int, weights) -> List[GameState]:
     population = []
-    for i in range(1000):
-        population.append(GameState(i, player, humans, zombies, 0))
+    for id in range(count):
+        population.append(GameState(id, player, humans, zombies, 0, weights))
     for gs in population:
         move = (random.randint(0, 16000), random.randint(0, 9000))
         gs.player.set_next_move(move)
@@ -68,7 +67,19 @@ def base_population_generation(player, humans, zombies) -> List[GameState]:
 
 
 @timeit
-def simulate_turn(population: List[GameState]) -> List[GameState]:
-    for game_state in population:
-        game_state.update_game_state()
-    return population
+def simulate_1game(game: GameState) -> GameState:
+    c = 0
+    assert isinstance(game, GameState), 'Wrong input'
+    while game.active:
+        # print(f'Turn {c}')
+        move = (random.randint(0, 16000), random.randint(0, 9000))
+        print(move)
+        game.player.set_next_move(move)
+        game.update_game_state()
+        c += 1
+    return game
+
+
+def simulate_population(population:List[GameState]):
+    for p in population:
+        p = simulate_1game(p)

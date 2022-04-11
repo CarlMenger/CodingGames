@@ -16,13 +16,20 @@ def visualize_turn(gs: GameState):
         x, y = z.point
         r = 400
         # Plot last one
-        plt.annotate(z.id, z.point)
-        plt.scatter(x, y, s=10, facecolors='g', edgecolors='g')
-        plt.scatter(x, y, s=r, facecolors='none', edgecolors='green')
+        plt.annotate(z.id, z.point, color='green')
+        plt.scatter(x, y, s=10, facecolors='g', edgecolors='g') # point
+        plt.scatter(x, y, s=r, facecolors='none', edgecolors='green') # circle
 
         # Plot history
         x = [move[0] for move in z.move_history]
         y = [move[1] for move in z.move_history]
+
+        # Circle when died
+        if z.turn_death:
+            x_death = x[z.turn_death]
+            y_death = y[z.turn_death]
+            plt.scatter(x_death, y_death, s=r, facecolors='none', edgecolors='green')  # circle
+
         x.append(z.point[0])
         y.append(z.point[1])
         plt.plot(x, y, color='green', linestyle='dashed', linewidth=1,
@@ -30,7 +37,8 @@ def visualize_turn(gs: GameState):
 
     # Plot humans
     for h in gs.humans:
-        human_color = ['black', 'blue'][h.alive == False]
+        human_color = ['black', 'blue'][h.alive] # Blue alive, Black dead
+        plt.annotate(h.id, h.point, color='blue')
         x, y = h.point
         r = 0
         plt.scatter(x, y, facecolors=human_color, edgecolors=human_color)
