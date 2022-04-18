@@ -1,3 +1,4 @@
+import math
 import random
 import time
 from functools import wraps
@@ -5,7 +6,7 @@ from typing import List
 
 from cVSz_classes import GameState, Player, Character, Zombie
 
-path = 'D:/__CodingGames/coding_games/codeVsZombies/simulation/input.txt'
+path = 'input.txt'
 
 
 def timeit(my_func):
@@ -67,19 +68,42 @@ def generate_base_population(player, humans, zombies, count: int, weights) -> Li
 
 
 @timeit
-def simulate_1game(game: GameState) -> GameState:
+def simulate_1game_single(game: GameState) -> GameState:
+    """ Simulate 1 population until loss/win"""
     c = 0
     assert isinstance(game, GameState), 'Wrong input'
     while game.active:
         # print(f'Turn {c}')
         move = (random.randint(0, 16000), random.randint(0, 9000))
-        print(move)
+        print(f'Move: {move}')
         game.player.set_next_move(move)
+        print(f'Dist change: {game.avg_dist_change()}')
+        print('------------------------------------------------------------')
         game.update_game_state()
         c += 1
     return game
 
 
-def simulate_population(population:List[GameState]):
+def simulate_1turn_all(population: List[GameState]):
+    new_pop = []
     for p in population:
-        p = simulate_1game(p)
+        new_pop.append(simulate_1game_single(p))
+    return new_pop
+
+
+# ***************************************************
+
+def selection(population):
+    pass
+
+
+def mating(population):
+    pass
+
+
+def crossover(population):
+    pass
+
+
+def mutation(population):
+    pass

@@ -20,7 +20,7 @@ class GameState:
         self.turn: int = turn + 1
 
         self.active: bool = True
-        self.state: int = 0                 # 0: Not resolved, -1: Loss, 1: Win
+        self.state: int = 0  # 0: Not resolved, -1: Loss, 1: Win
 
         self.weights: dict = weights
 
@@ -133,7 +133,8 @@ class GameState:
 
     def update_score(self):
         humans_alive_cnt = len(self.get_alive_humans())
-        zombies_dead_cnt = len([zombie for zombie in self.zombies if not zombie.alive and zombie.turn_death == self.turn])
+        zombies_dead_cnt = len(
+            [zombie for zombie in self.zombies if not zombie.alive and zombie.turn_death == self.turn])
         self.score += (math.sqrt(humans_alive_cnt) * 10) * (KILL_MODIFIER[zombies_dead_cnt])
 
     def update_score_decision(self):  # FIXME: trim this down + set options to turn off coefficients
@@ -186,6 +187,7 @@ class GameState:
     def check_game_status(self):
         if not self.get_alive_humans() or not self.get_alive_zombies():
             self.active = False
+            # Humans dead
             if not self.get_alive_humans():
                 self.state = -1
                 print('Game Over: Loss')
@@ -196,6 +198,30 @@ class GameState:
             # quit()
         return False
 
+    def fitting_score(self):
+        """ Calc score to fit given gene (player move)
+            features::
+            score/killed zombies
+            humans left
+            score potential? (max possible point to earn)
+            current score?
+
+        """
+        pass
+
+    def avg_dist_change(self):
+        """ Potential feature for fitting func
+        ++ is good
+        -- is bad
+        """
+        dist0 = 0  # Total dist to current point
+        dist1 = 0  # Total dist to next point
+        for z in self.get_alive_zombies():
+            dist0 += math.dist(self.player.point, z.point)
+            dist1 += math.dist(self.player.point_next, z.point)
+        dist_diff = dist0 - dist1
+        return dist_diff / len(self.get_alive_zombies())
+
 
 class Character:
     _slots_ = ('id', 'point', 'point_next', 'move_history', 'alive', 'turn_death')
@@ -205,7 +231,7 @@ class Character:
         self.point: tuple = point
         self.point_next: tuple = point_next
         self.move_history: List[tuple] = []
-        self.alive = True                            # FIXME: Can be replaced by turn_death
+        self.alive = True  # FIXME: Can be replaced by turn_death
         self.turn_death = None
 
     def __str__(self) -> str:
