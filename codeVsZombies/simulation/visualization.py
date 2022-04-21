@@ -60,8 +60,9 @@ def visualize_turn(gs: GameState):
     y.append(p.point[1])
     plt.plot(x, y, color='red', linestyle='dashed', linewidth=1,
              marker='o', markerfacecolor='red', markersize=2)
-    for i, point in enumerate((*x, *y)):
+    for i, point in enumerate(p.move_history):
         plt.annotate(i, xy=point)
+        # print(point)
     plt.show()
 
     # plotting the points

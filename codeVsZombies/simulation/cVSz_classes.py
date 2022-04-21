@@ -32,30 +32,29 @@ class GameState:
                f'Turn: {self.turn}'
 
     # ************************************** DEBUG *******************************************************************
-    def debug(self):
-        # TODO: dist matrix zombies to player+humans
-        print("{:<8} {:<10} {:<12}".format('ZOMBIE', 'CHARACTER', 'DISTANCE'))
-        for zombie in self.get_alive_zombies():
-            for human in self.get_alive_humans() + [self.player]:
-                print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
-
-    # TEST FUNC
-    def test_zombie_points(self, num):
-        print('')
-        for z in self.get_alive_zombies():
-            dist_change = math.dist(z.point, z.point_next)
-            dist2target = math.dist(z.point, z.target_point)
-            print(f'--- Zombie {z.id} --- ')
-            print(f'{z.point} --> {z.point_next}; target/id: {z.target_point}/{z.target_id} ++ {round(dist_change)} ')
-            print(f'Dist before moving {dist2target} ({round(dist2target / 400, 2)}) ')
-            print(f'Score_decision: {self.score_decision}')
-            print('')
+    # def debug(self):
+    #     # TODO: dist matrix zombies to player+humans
+    #     print("{:<8} {:<10} {:<12}".format('ZOMBIE', 'CHARACTER', 'DISTANCE'))
+    #     for zombie in self.get_alive_zombies():
+    #         for human in self.get_alive_humans() + [self.player]:
+    #             print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
+    #
+    # # TEST FUNC
+    # def test_zombie_points(self, num):
+    #     print('')
+    #     for z in self.get_alive_zombies():
+    #         dist_change = math.dist(z.point, z.point_next)
+    #         dist2target = math.dist(z.point, z.target_point)
+    #         print(f'--- Zombie {z.id} --- ')
+    #         print(f'{z.point} --> {z.point_next}; target/id: {z.target_point}/{z.target_id} ++ {round(dist_change)} ')
+    #         print(f'Dist before moving {dist2target} ({round(dist2target / 400, 2)}) ')
+    #         print(f'Score_decision: {self.score_decision}')
+    #         print('')
 
     # ************************************** /DEBUG ******************************************************************
     def update_game_state(self):
         # Moving
         self.zombies_find_next_target()  # zombies can be init with no next target
-        self.test_zombie_points(f" Turn {self.turn}")
         self.zombies_move2next_point()
         self.player_move2next_point()
 

@@ -5,6 +5,7 @@ from functools import wraps
 from typing import List
 
 from cVSz_classes import GameState, Player, Character, Zombie
+from debug import debug
 
 path = 'input.txt'
 
@@ -68,20 +69,18 @@ def generate_base_population(player, humans, zombies, count: int, weights) -> Li
 
 
 @timeit
-def simulate_1game_single(game: GameState) -> GameState:
+def simulate_1game_single(ws: GameState) -> GameState:
     """ Simulate 1 population until loss/win"""
     c = 0
-    assert isinstance(game, GameState), 'Wrong input'
-    while game.active:
-        # print(f'Turn {c}')
+    assert isinstance(ws, GameState), 'Wrong input'
+    while ws.active:
         move = (random.randint(0, 16000), random.randint(0, 9000))
-        print(f'Move: {move}')
-        game.player.set_next_move(move)
-        print(f'Dist change: {game.avg_dist_change()}')
-        print('------------------------------------------------------------')
-        game.update_game_state()
+        ws.player.set_next_move(move)
+        # print(f'Dist change: {game.avg_dist_change()}')
+        debug(ws)
+        ws.update_game_state()
         c += 1
-    return game
+    return ws
 
 
 def simulate_1turn_all(population: List[GameState]):

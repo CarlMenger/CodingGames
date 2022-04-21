@@ -2,10 +2,11 @@
 from cVSz_funcs import *
 from visualization import visualize_turn
 import timeit
+from debug import debug
 
 WEIGHTS = {
     'zombie_dist': 0.3,
-    'human_dist': 0.8
+    'human_dist': 0.8,
 }
 player, humans, zombies = load_init_data_offline()
 
@@ -15,14 +16,12 @@ game.weights = WEIGHTS
 game = simulate_1game_single(game)
 visualize_turn(game)
 
-
 # TODO: Chain funcs?
 population = generate_base_population(player, humans, zombies, 10, weights=WEIGHTS)
 selected_population = selection(population)
 mated_population = mating(selected_population)
 # crossover
 # mutation
-
 
 
 # new_generation = []
