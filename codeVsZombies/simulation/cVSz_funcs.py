@@ -3,9 +3,10 @@ import random
 import time
 from functools import wraps
 from typing import List
+from debug import debug_basic
 
 from cVSz_classes import GameState, Player, Character, Zombie
-from debug import debug
+
 
 path = 'input.txt'
 
@@ -77,8 +78,9 @@ def simulate_1game_single(ws: GameState) -> GameState:
         move = (random.randint(0, 16000), random.randint(0, 9000))
         ws.player.set_next_move(move)
         # print(f'Dist change: {game.avg_dist_change()}')
-        debug(ws)
         ws.update_game_state()
+        # debug_basic(ws, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
+        debug_basic(ws, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
         c += 1
     return ws
 

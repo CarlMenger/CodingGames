@@ -114,8 +114,6 @@ class GameState:
     def player_kill(self):
         for zombie in self.get_alive_zombies():
             if math.dist(self.player.point, zombie.point) <= PLAYER_RANGE:
-                print(
-                    f'Player kills Zombie {zombie.id}; In Range?:[{math.dist(zombie.point, self.player.point) <= 2000}]')
                 zombie.alive = False
                 zombie.turn_death = self.turn
 
@@ -125,8 +123,6 @@ class GameState:
             for human in self.humans:
                 assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
                 if math.dist(zombie.point, human.point) <= ZOMBIE_RANGE:
-                    print(
-                        f'Zombie {zombie.id} kills Human {human.id}; In Range?:[{math.dist(zombie.point, human.point) <= 400}]')
                     human.alive = False
                     human.turn_death = self.turn
 

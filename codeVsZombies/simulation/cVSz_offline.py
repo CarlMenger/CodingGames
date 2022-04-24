@@ -2,7 +2,7 @@
 from cVSz_funcs import *
 from visualization import visualize_turn
 import timeit
-from debug import debug
+from debug import debug_basic
 
 WEIGHTS = {
     'zombie_dist': 0.3,
