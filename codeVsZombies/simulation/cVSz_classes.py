@@ -53,6 +53,10 @@ class GameState:
 
     # ************************************** /DEBUG ******************************************************************
     def update_game_state(self):
+        """
+        Main function to update game state. Called after each turn. Update movements directions.
+        Move player, move zombies. Kill. Check game status. Update Score
+        """
         # Moving
         self.zombies_find_next_target()  # zombies can be init with no next target
         self.zombies_move2next_point()
@@ -148,14 +152,6 @@ class GameState:
         score += zd_avg_diff * self.weights['zombie_dist'] + hd_avg_diff * self.weights['human_dist']
         # return score
         self.score_decision = score
-
-    # def remove_dead_zombies(self):  # FIXME: is necessary? + losing some information
-    #     id2remove = []
-    #     for zombie in self.zombies:
-    #         if not zombie.alive:
-    #             id2remove.append(zombie.id)
-    #     for i in id2remove:
-    #         del self.zombies[i]
 
     def get_human(self, id):
         for human in self.humans:

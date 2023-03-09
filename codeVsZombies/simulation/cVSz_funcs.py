@@ -23,6 +23,7 @@ def timeit(my_func):
     return timed
 
 
+
 def load_init_data_online() -> GameState:
     """ keep 2 lists of objects, keep player as last id/position human"""
     humans = []
@@ -69,42 +70,30 @@ def generate_base_population(player, humans, zombies, count: int, weights) -> Li
     return population
 
 
+# TODO: should be method of GameState, parametrize debug/ or make Simulation class and allow for different scenarios
+# TODO: keep GameState as class, but make it DataClass. GameState.increment_turn()
+# TODO: make debug as Debugger Class
+# TODO: make 'move' a Point class
 @timeit
-def simulate_1game_single(ws: GameState) -> GameState:
+def simulate_game_single_pop(gs: GameState) -> GameState:
     """ Simulate 1 population until loss/win"""
     c = 0
-    assert isinstance(ws, GameState), 'Wrong input'
-    while ws.active:
+    assert isinstance(gs, GameState), 'Wrong input'
+    while gs.active: 
         move = (random.randint(0, 16000), random.randint(0, 9000))
-        ws.player.set_next_move(move)
+        gs.player.set_next_move(move)
         # print(f'Dist change: {game.avg_dist_change()}')
-        ws.update_game_state()
-        # debug_basic(ws, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
-        debug_basic(ws, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
+        gs.update_game_state()
+        # debug_basic(gs, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
+        debug_basic(gs, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
         c += 1
-    return ws
+    return gs
 
 
 def simulate_1turn_all(population: List[GameState]):
     new_pop = []
     for p in population:
-        new_pop.append(simulate_1game_single(p))
+        new_pop.append(simulate_game_single_pop(p))
     return new_pop
 
 
-# ***************************************************
-
-def selection(population):
-    pass
-
-
-def mating(population):
-    pass
-
-
-def crossover(population):
-    pass
-
-
-def mutation(population):
-    pass

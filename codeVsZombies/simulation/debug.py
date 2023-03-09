@@ -6,19 +6,18 @@ import numpy as np
 import pandas as pd
 
 from cVSz_classes import GameState
+from logging.handlers import RotatingFileHandler
 
-OUTPUT_DIR = "D:\__CodingGames\coding_games\codeVsZombies\simulation\debug_dump"
-today = datetime.today()
-current_time = today.strftime("%Y%m%d_%H-%M-%S")
-logger = logging.getLogger('mylogger')
-handler = logging.FileHandler(f'{OUTPUT_DIR}\{current_time}.log')
+# Configure the logging module
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s')
+
+current_time = datetime.today().strftime("%Y%m%d_%H-%M-%S")
+handler = RotatingFileHandler(filename=rf'logs/{current_time}.log', maxBytes=1024 * 1024, backupCount=5)
+handler.setFormatter(formatter)
 logger.addHandler(handler)
-
-
-# logger.warning('This is a WARNING message')
-# logger.error('This is an ERROR message')
-# logger.critical('This is a CRITICAL message')
-# logger.info('This is a CRITICAL message')
 
 
 def print_zombie_points(ws):
