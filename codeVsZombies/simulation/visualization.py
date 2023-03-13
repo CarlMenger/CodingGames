@@ -2,6 +2,8 @@ import numpy as np
 from cVSz_classes import GameState
 import matplotlib.pyplot as plt
 
+# TODO: Make this able to take GS in any state and visualize up to that point, being able to save
+# TODO: some genomes as ash path and use it for debugging
 
 def visualize_turn(gs: GameState):
     # Common settings
@@ -26,8 +28,8 @@ def visualize_turn(gs: GameState):
 
         # Circle when died
         if z.turn_death:
-            x_death = x[z.turn_death]
-            y_death = y[z.turn_death]
+            x_death = x[-1]
+            y_death = y[-1]
             plt.scatter(x_death, y_death, s=r, facecolors='none', edgecolors='green')  # circle
 
         x.append(z.point[0])

@@ -1,0 +1,5 @@
+Scoring works as follows:
+A zombie is worth the number of humans still alive squared x10, not including Ash.
+If several zombies are destroyed during on the same round,
+the nth zombie killed's worth is multiplied by the (n+2)th number of the Fibonnacci sequence (1, 2, 3, 5, 8, and so on).
+ As a consequence, you should kill the maximum amount of zombies during a same turn.

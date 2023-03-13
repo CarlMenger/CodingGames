@@ -3,10 +3,9 @@ import random
 import time
 from functools import wraps
 from typing import List
-from debug import debug_basic
 
 from cVSz_classes import GameState, Player, Character, Zombie
-
+from constants import KILL_MODIFIER
 
 path = 'input.txt'
 
@@ -23,9 +22,10 @@ def timeit(my_func):
     return timed
 
 
-
-def load_init_data_online() -> GameState:
-    """ keep 2 lists of objects, keep player as last id/position human"""
+def load_init_data_online() -> dict:
+    """
+    Load data in online environment for a actual validation.
+    """
     humans = []
     zombies = []
     player_x, player_y = [int(i) for i in input().split()]
@@ -38,11 +38,15 @@ def load_init_data_online() -> GameState:
     for i in range(zombie_count):
         zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = [int(j) for j in input().split()]
         zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
-    return GameState(0, player, humans, zombies, 0)
+    return dict(player=player, humans=humans, zombies=zombies)
 
 
 @timeit
-def load_init_data_offline():
+def load_init_data_offline() -> dict:
+    """
+    Load data from txt file structured in the same way as online data source. Returns dict of lists containing data
+    necessary for initialization of GameState. Player Obj., List[Humans],  List[Zombie].
+    """
     humans = []
     zombies = []
     with open(path, 'r+') as data:
@@ -56,17 +60,14 @@ def load_init_data_offline():
         for i in range(zombie_count):
             zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = map(int, data.readline().split())
             zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
-    return player, humans, zombies
+    return dict(player=player, humans=humans, zombies=zombies)
 
 
 @timeit
-def generate_base_population(player, humans, zombies, count: int, weights) -> List[GameState]:
+def generate_init_population(init_data, count: int) -> List[GameState]:
     population = []
     for id in range(count):
-        population.append(GameState(id, player, humans, zombies, 0, weights))
-    for gs in population:
-        move = (random.randint(0, 16000), random.randint(0, 9000))
-        gs.player.set_next_move(move)
+        population.append(GameState(id, init_data, 0))
     return population
 
 
@@ -74,26 +75,62 @@ def generate_base_population(player, humans, zombies, count: int, weights) -> Li
 # TODO: keep GameState as class, but make it DataClass. GameState.increment_turn()
 # TODO: make debug as Debugger Class
 # TODO: make 'move' a Point class
+# TODO: make simulation Class?
+# TODO: Calc theoretical maximum
+
+# TODO: remove this, move move = (random.randint(0, 16000), random.randint(0, 9000))
+# TODO: away, probably in Simulation class. Same for debugging probably
+# @timeit
+# def simulate_single_round(gs: GameState, debugging=False) -> GameState:
+#     """ Simulate 1 population until loss/win"""
+#     assert isinstance(gs, GameState), 'Wrong input'
+#     while gs.active:
+#         player_move = (random.randint(0, 16000), random.randint(0, 9000))
+#         gs.player.set_next_move(player_move)
+#         # print(f'Dist change: {game.avg_dist_change()}')
+#         gs.resolve_turn(player_move)
+#         # debug_basic(gs, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
+#         if debugging:
+#             debug_basic(gs, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
+#     return gs
+
+
+# TODO: parametrize timeit to show how many populations it created
 @timeit
-def simulate_game_single_pop(gs: GameState) -> GameState:
-    """ Simulate 1 population until loss/win"""
-    c = 0
-    assert isinstance(gs, GameState), 'Wrong input'
-    while gs.active: 
-        move = (random.randint(0, 16000), random.randint(0, 9000))
-        gs.player.set_next_move(move)
-        # print(f'Dist change: {game.avg_dist_change()}')
-        gs.update_game_state()
-        # debug_basic(gs, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
-        debug_basic(gs, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
-        c += 1
-    return gs
+def simulate_population(population_base: List[GameState]) -> List[GameState]:
+    for genome in population_base:
+        genome.resolve_game()
+    return population_base
 
 
-def simulate_1turn_all(population: List[GameState]):
-    new_pop = []
-    for p in population:
-        new_pop.append(simulate_game_single_pop(p))
-    return new_pop
+def report_population(population: List[GameState], human_cnt, zombie_cnt, show_top_cnt=15):
+    """
+    Report basic statistics about the GameState: Top X score, avg score,
+    """
+
+    print(f'Max possible score: {calc_max_possible_score(human_cnt, zombie_cnt)}')
+    # TODO: use filters()?
+    scores = [round(gene.score) for gene in population]
+    top_performers = sorted(scores, reverse=True)[:show_top_cnt]
+    score_avg = round(sum(scores) / len(scores), 3)
+    print(f"{top_performers=}")
+    print(f"{score_avg=}")
+
+    # print(f'{population[0].zombies[0].turn_death=}')
+    # print(f'{population[0].zombies[0].alive=}')
+    # print(f'{population[0].zombies[0].turn_death=}')
+    # print(f'{population[0].zombies[1].alive=}')
 
 
+# TODO: formula for score calc is already in 2 places, consider moving it out
+def calc_max_possible_score(human_cnt: int, zombie_cnt: int) -> float:
+    sum = 0
+    for nth_zombie_killed in range(zombie_cnt + 1):
+        sum += (math.sqrt(human_cnt) * 10) * KILL_MODIFIER[nth_zombie_killed]
+    return sum
+
+
+# 1 genome = 1 round == X turns
+# 1 population = X genomes/ rounds
+
+# TODO: Save top performers for analysis (as player.move_history)

@@ -1,63 +1,55 @@
 import math
+import random
 from typing import List
-
-KILL_MODIFIER = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987]
-PLAYER_RANGE = 2000
-ZOMBIE_RANGE = 400
+from constants import PLAYER_RANGE, ZOMBIE_RANGE, KILL_MODIFIER
+# from simulation.cVSz_funcs import generate_random_move
 
 
 class GameState:
-    __slots__ = ('id', 'player', 'humans', 'zombies', 'score', 'score_decision', 'turn', 'active', 'state', 'weights')
+    __slots__ = ('id', 'player', 'humans', 'zombies', 'score', 'score_decision', 'turn', 'active', 'state',)
 
-    def __init__(self, id, player, humans, zombies, turn, weights):
+    def __init__(self, id, init_data, turn):
         self.id = id
-        self.player: Player = player
-        self.humans: List[Character] = humans
-        self.zombies: List[Zombie] = zombies
+        self.player: Player = init_data['player']
+        self.humans: List[Character] = init_data['humans']
+        self.zombies: List[Zombie] = init_data['zombies']
 
-        self.score: int = 0  # Actual score
+        self.score: int = 0  # Actual score, set as -1 on game loss
         self.score_decision: float = 0  # Output of scoring function for gene selection
-        self.turn: int = turn + 1
+        self.turn: int = turn  # FIXME: Why even initialize, always 0, nth players turn can be determined from Player class
 
-        self.active: bool = True
+        self.active: bool = True  # Is game still going
         self.state: int = 0  # 0: Not resolved, -1: Loss, 1: Win
 
-        self.weights: dict = weights
+        # self.weights: dict = weights
 
     def __repr__(self):
-        return f'Humans: {len(self.get_alive_humans())}/{len(self.humans)}, ' \
-               f'Zombies: {len(self.get_alive_zombies())}/{len(self.zombies)},  ' \
-               f'Score: {round(self.score)},  ' \
-               f'Score_decision: {self.score_decision},  ' \
-               f'Turn: {self.turn}'
+        return f'Humans: {len(self.get_alive_humans())}/{len(self.humans)},\t' \
+               f'Zombies: {len(self.get_alive_zombies())}/{len(self.zombies)},\t' \
+               f'Score: {round(self.score)},\t' \
+               f'Score_decision: {self.score_decision},\t' \
+               f'Turn: {self.turn},\t' \
+               f'State: {self.state},\t'
 
-    # ************************************** DEBUG *******************************************************************
-    # def debug(self):
-    #     # TODO: dist matrix zombies to player+humans
-    #     print("{:<8} {:<10} {:<12}".format('ZOMBIE', 'CHARACTER', 'DISTANCE'))
-    #     for zombie in self.get_alive_zombies():
-    #         for human in self.get_alive_humans() + [self.player]:
-    #             print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
-    #
-    # # TEST FUNC
-    # def test_zombie_points(self, num):
-    #     print('')
-    #     for z in self.get_alive_zombies():
-    #         dist_change = math.dist(z.point, z.point_next)
-    #         dist2target = math.dist(z.point, z.target_point)
-    #         print(f'--- Zombie {z.id} --- ')
-    #         print(f'{z.point} --> {z.point_next}; target/id: {z.target_point}/{z.target_id} ++ {round(dist_change)} ')
-    #         print(f'Dist before moving {dist2target} ({round(dist2target / 400, 2)}) ')
-    #         print(f'Score_decision: {self.score_decision}')
-    #         print('')
+    def generate_random_move(self):
+        return random.randint(0, 16000), random.randint(0, 9000)
 
-    # ************************************** /DEBUG ******************************************************************
-    def update_game_state(self):
+    # TODO: this should be moved and have a way to change hot to generate player moves
+    def resolve_game(self, mode='random'):
+        while self.active:
+            self.turn += 1
+            player_move = self.generate_random_move()
+            self.resolve_turn(player_move)
+            # print(self)
+
+    # TODO: This should be fed players next move directly
+    def resolve_turn(self, player_move):
         """
-        Main function to update game state. Called after each turn. Update movements directions.
-        Move player, move zombies. Kill. Check game status. Update Score
+        Simulate single turn. Update movements directions. Move player, move zombies. Kill.
+        Check game status. Update Score.
         """
         # Moving
+        self.set_player_next_move(player_move)
         self.zombies_find_next_target()  # zombies can be init with no next target
         self.zombies_move2next_point()
         self.player_move2next_point()
@@ -68,11 +60,7 @@ class GameState:
         self.zombies_kill()  # humans.point changed
         self.check_game_status()
 
-        if self.active:
-            # Recalculating if game is not over
-            self.update_score()
-            self.update_score_decision()
-            # self.remove_dead_zombies()
+        self.update_score()
 
     # MOVEMENT
     def player_move2next_point(self):
@@ -97,7 +85,7 @@ class GameState:
             zombie.point_next = self.get_point_next(zombie.point, zombie.target_point)  # Set path to target
 
     def zombies_move2next_point(self):
-        for zombie in self.zombies:
+        for zombie in self.get_alive_zombies():
             zombie.move_history.append(zombie.point)  # Save current point
             zombie.point = zombie.point_next  # Current point = Next point
 
@@ -131,29 +119,19 @@ class GameState:
                     human.turn_death = self.turn
 
     def update_score(self):
-        humans_alive_cnt = len(self.get_alive_humans())
-        zombies_dead_cnt = len(
-            [zombie for zombie in self.zombies if not zombie.alive and zombie.turn_death == self.turn])
-        self.score += (math.sqrt(humans_alive_cnt) * 10) * (KILL_MODIFIER[zombies_dead_cnt])
+        # Loss
+        if self.state == -1:
+            self.score = -1
+        else:
+            humans_alive_cnt = len(self.get_alive_humans())
+            assert humans_alive_cnt > 0, f'[Error] Scoring with {humans_alive_cnt} humans left'
 
-    def update_score_decision(self):  # FIXME: trim this down + set options to turn off coefficients
-        """ {}_w: weight for average distance increase to {}"""
-        zombies = self.get_alive_zombies()
-        humans = self.get_alive_humans()
-        score = 0
-        zd_avg_t0 = sum([math.dist(self.player.point, z.point) for z in zombies]) / len(zombies)
-        zd_avg_t1 = sum([math.dist(self.player.point_next, z.point_next) for z in zombies]) / len(zombies)
-        zd_avg_diff = zd_avg_t0 - zd_avg_t1
+            zombies_dead_this_turn_cnt = len(
+                [zombie for zombie in self.zombies if not zombie.alive and zombie.turn_death == self.turn])
+            if zombies_dead_this_turn_cnt > 0:
+                self.score += (math.sqrt(humans_alive_cnt) * 10) * KILL_MODIFIER[zombies_dead_this_turn_cnt]
 
-        hd_avg_t0 = sum([math.dist(self.player.point, h.point) for h in humans]) / len(humans)
-        hd_avg_t1 = sum([math.dist(self.player.point_next, h.point_next) for h in humans]) / len(humans)
-        hd_avg_diff = hd_avg_t0 - hd_avg_t1
-
-        score += zd_avg_diff * self.weights['zombie_dist'] + hd_avg_diff * self.weights['human_dist']
-        # return score
-        self.score_decision = score
-
-    def get_human(self, id):
+    def get_human_by_id(self, id):
         for human in self.humans:
             if human.id == id:
                 return human
@@ -175,19 +153,21 @@ class GameState:
     def get_alive_humans(self):
         return [human for human in self.humans if human.alive]
 
-    def check_game_status(self):
-        if not self.get_alive_humans() or not self.get_alive_zombies():
+    def check_game_status(self, print_status=False):
+        """
+        If all humans or all zombies are dead
+        """
+
+        if not self.get_alive_zombies():
             self.active = False
-            # Humans dead
-            if not self.get_alive_humans():
-                self.state = -1
-                print('Game Over: Loss')
-            else:
-                self.state = 1
-                print('Game Over: Win')
-            print(f'{self}')
-            # quit()
-        return False
+            self.state = 1
+            # print('Game Over: Win')
+        if not self.get_alive_humans():
+            self.active = False
+            self.state = -1
+            # print('Game Over: Loss')
+        # quit()
+        # return False
 
     def fitting_score(self):
         """ Calc score to fit given gene (player move)
@@ -201,7 +181,8 @@ class GameState:
         pass
 
     def avg_dist_change(self):
-        """ Potential feature for fitting func
+        """ Average change in distance between Player and All alive zombies.
+            Potential feature for fitting func.
         ++ is good
         -- is bad
         """
@@ -254,5 +235,3 @@ class Zombie(Character):
         self.target_point: tuple = ()
         self.target_distance: float = float('inf')  # FIXME: useful?
         self.interception_turns: int = -1  # FIXME: useful?
-
-# TODO: why keep point_next for player? Its generated externally and just inputted

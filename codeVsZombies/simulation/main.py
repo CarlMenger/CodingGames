@@ -1,37 +1,31 @@
-# from cVSz_classes import *
-from cVSz_funcs import *
-from visualization import visualize_turn
-import timeit
-from debug import debug_basic
+from cVSz_funcs import load_init_data_online, load_init_data_offline, generate_init_population, simulate_population, \
+    report_population, timeit
+import platform
+
+from simulation.visualization import visualize_turn
+
+
+@timeit
 def main():
+    # NTB
+    if platform.node() == 'CZ-L1132':
+        game_state_init_data = load_init_data_offline()
+    else:
+        game_state_init_data = load_init_data_online()
 
-    WEIGHTS = {
-        'zombie_dist': 1,
-        'human_dist': 1,
-    }
-    player, humans, zombies = load_init_data_offline()
+    # TEMP TEST SETUP
+    test_case_count = 10000
 
-    # Simulate 1 game
-    game = GameState(id, player, humans, zombies, 0, WEIGHTS)
-    game = simulate_1game_single(game)
-    visualize_turn(game)
+    z_cnt = len(game_state_init_data['zombies'])
+    h_cnt = len(game_state_init_data['humans'])
 
-    # population = generate_base_population(player, humans, zombies, 10, WEIGHTS)
-    # selected_population = selection(population)
-    # mated_population = mating(selected_population)
+    population_base = generate_init_population(game_state_init_data, test_case_count)
+    population_simulated = simulate_population(population_base)
+    report_population(population_simulated, human_cnt=h_cnt, zombie_cnt=z_cnt)
+    visualize_turn(population_simulated[0])
 
-
-    # new_generation = []
-    # for pop in population:
-    #     new_generation.append(simulate_1game(pop))
-    # for gene in new_generation:
-    #     print(gene.id)
-
-    # TODO: Calculating score for move to already preselect better one?
 
 if __name__ == '__main__':
     main()
 
-
-# TODO: make load online data return data, same as offline
-# TODO: feed the same data into GameState
+# TODO: Wtf is score == 0?
