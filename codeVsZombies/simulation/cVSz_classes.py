@@ -16,12 +16,11 @@ class GameState:
 
         self.score: int = 0  # Actual score, set as -1 on game loss
         self.score_decision: float = 0  # Output of scoring function for gene selection
-        self.turn: int = turn  # FIXME: Why even initialize, always 0, nth players turn can be determined from Player class
+        self.turn: int = 0
+        # self.turn: int = turn  # FIXME: Why even initialize, always 0, nth players turn can be determined from Player class
 
         self.active: bool = True  # Is game still going
         self.state: int = 0  # 0: Not resolved, -1: Loss, 1: Win
-
-        # self.weights: dict = weights
 
     def __repr__(self):
         return f'Humans: {len(self.get_alive_humans())}/{len(self.humans)},\t' \
@@ -34,15 +33,15 @@ class GameState:
     def generate_random_move(self):
         return random.randint(0, 16000), random.randint(0, 9000)
 
-    # TODO: this should be moved and have a way to change hot to generate player moves
+    # TODO: this should be moved and have a way to change strategy of how to generate player moves
     def resolve_game(self, mode='random'):
         while self.active:
             self.turn += 1
             player_move = self.generate_random_move()
             self.resolve_turn(player_move)
+
             # print(self)
 
-    # TODO: This should be fed players next move directly
     def resolve_turn(self, player_move):
         """
         Simulate single turn. Update movements directions. Move player, move zombies. Kill.
@@ -235,3 +234,6 @@ class Zombie(Character):
         self.target_point: tuple = ()
         self.target_distance: float = float('inf')  # FIXME: useful?
         self.interception_turns: int = -1  # FIXME: useful?
+
+class Point:
+    pass

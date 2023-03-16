@@ -76,23 +76,6 @@ def generate_init_population(init_data, count: int) -> List[GameState]:
 # TODO: make debug as Debugger Class
 # TODO: make 'move' a Point class
 # TODO: make simulation Class?
-# TODO: Calc theoretical maximum
-
-# TODO: remove this, move move = (random.randint(0, 16000), random.randint(0, 9000))
-# TODO: away, probably in Simulation class. Same for debugging probably
-# @timeit
-# def simulate_single_round(gs: GameState, debugging=False) -> GameState:
-#     """ Simulate 1 population until loss/win"""
-#     assert isinstance(gs, GameState), 'Wrong input'
-#     while gs.active:
-#         player_move = (random.randint(0, 16000), random.randint(0, 9000))
-#         gs.player.set_next_move(player_move)
-#         # print(f'Dist change: {game.avg_dist_change()}')
-#         gs.resolve_turn(player_move)
-#         # debug_basic(gs, adc_action=True, adc_character='zombies', distance_matrix=True, zombie_points=True)
-#         if debugging:
-#             debug_basic(gs, adc_action=False, adc_character='zombies', distance_matrix=False, zombie_points=False)
-#     return gs
 
 
 # TODO: parametrize timeit to show how many populations it created
@@ -105,7 +88,7 @@ def simulate_population(population_base: List[GameState]) -> List[GameState]:
 
 def report_population(population: List[GameState], human_cnt, zombie_cnt, show_top_cnt=15):
     """
-    Report basic statistics about the GameState: Top X score, avg score,
+    Report basic statistics on bunch of GameStates: Top X score, avg score,
     """
 
     print(f'Max possible score: {calc_max_possible_score(human_cnt, zombie_cnt)}')
@@ -115,11 +98,29 @@ def report_population(population: List[GameState], human_cnt, zombie_cnt, show_t
     score_avg = round(sum(scores) / len(scores), 3)
     print(f"{top_performers=}")
     print(f"{score_avg=}")
+    print(f"{score_avg=}")
 
     # print(f'{population[0].zombies[0].turn_death=}')
     # print(f'{population[0].zombies[0].alive=}')
     # print(f'{population[0].zombies[0].turn_death=}')
     # print(f'{population[0].zombies[1].alive=}')
+
+
+def report_single_game(game: GameState):
+    """
+    Report basic statistics on a single GameState:
+    """
+    print(f'Result: {game.state}')
+    print(f'Turns num: {len(game.player.move_history)}')
+
+    # Zombie death
+    print(f'{game.zombies[0].turn_death=}')
+    print(f'{game.zombies[1].turn_death=}')
+
+    # Human death
+    print(f'{game.humans[0].turn_death=}')
+    print(f'{game.humans[1].turn_death=}')
+
 
 
 # TODO: formula for score calc is already in 2 places, consider moving it out
@@ -128,7 +129,6 @@ def calc_max_possible_score(human_cnt: int, zombie_cnt: int) -> float:
     for nth_zombie_killed in range(zombie_cnt + 1):
         sum += (math.sqrt(human_cnt) * 10) * KILL_MODIFIER[nth_zombie_killed]
     return sum
-
 
 # 1 genome = 1 round == X turns
 # 1 population = X genomes/ rounds
