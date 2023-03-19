@@ -2,13 +2,13 @@ from cVSz_funcs import load_init_data_online, load_init_data_offline, generate_i
     report_population, timeit, report_single_game
 import platform
 
-from simulation.visualization import visualize_turn
+from visualization import visualize_turn
 
 
 @timeit
 def main():
     # NTB
-    if platform.node() == 'CZ-L1132':
+    if platform.node() in ('CZ-L1132', 'DESKTOP-JK8TMGJ'):
         game_state_init_data = load_init_data_offline()
     else:
         game_state_init_data = load_init_data_online()

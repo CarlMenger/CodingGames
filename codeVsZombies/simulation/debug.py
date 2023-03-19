@@ -7,6 +7,7 @@ import pandas as pd
 
 from cVSz_classes import GameState
 from logging.handlers import RotatingFileHandler
+from cVSz_funcs import dist
 
 # Configure the logging module
 logger = logging.getLogger()
@@ -23,10 +24,10 @@ logger.addHandler(handler)
 def print_zombie_points(ws):
     print('')
     for z in ws.get_alive_zombies():
-        dist_change = math.dist(z.point, z.point_next)
-        dist2target = math.dist(z.point, z.target_point)
+        dist_change = dist(z.point_current, z.point_next)
+        dist2target = dist(z.point_current, z.target_point)
         print(f'--- Zombie {z.id} --- ')
-        print(f'{z.point} --> {z.point_next}:[{round(dist_change)}]; target/id: {z.target_point}/{z.target_id}')
+        print(f'{z.point_current} --> {z.point_next}:[{round(dist_change)}]; target/id: {z.target_point}/{z.target_id}')
         # print(f'Dist to target: {dist2target} ({round(dist2target / 400, 2)}) ')
         print(f'Score_decision: {ws.score_decision}')
         print('')
@@ -36,7 +37,7 @@ def print_distance_matrix(ws):
     print("{:<8} {:<10} {:<12}".format('ZOMBIE', 'CHARACTER', 'DISTANCE'))
     for zombie in ws.get_alive_zombies():
         for human in ws.get_alive_humans() + [ws.player]:
-            print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(math.dist(zombie.point, human.point))))
+            print('{:<8} {:<10} {:<12}'.format(zombie.id, human.id, round(dist(zombie.point_current, human.point_current))))
 
 
 def print_distance_matrix2(ws):
@@ -46,7 +47,7 @@ def print_distance_matrix2(ws):
     for character in [ws.player] + ws.get_alive_humans():
         row = []
         for z in ws.get_alive_zombies():
-            row.append(round(math.dist(character.point, z.point)))
+            row.append(round(dist(character.point_current, z.point_current)))
         matrix.append(row)
 
     # Format output
@@ -74,8 +75,8 @@ def print_adc(ws: GameState, characters='zombies'):
         dist0 = 0  # Total dist to current point
         dist1 = 0  # Total dist to next point
         for z in obj_list:
-            dist0 += math.dist(ws.player.point, z.point)
-            dist1 += math.dist(ws.player.point_next, z.point)
+            dist0 += dist(ws.player.point_current, z.point_current)
+            dist1 += dist(ws.player.point_next, z.point_current)
         dist_diff = (dist0 - dist1) / len(obj_list)
         # return dist_diff
         print(f'Average distance change to {characters}: {dist_diff}')

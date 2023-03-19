@@ -1,10 +1,9 @@
 import math
-import random
 import time
 from functools import wraps
 from typing import List
 
-from cVSz_classes import GameState, Player, Character, Zombie
+from cVSz_classes import GameState, Player, Character, Zombie, Point
 from constants import KILL_MODIFIER
 
 path = 'input.txt'
@@ -30,15 +29,19 @@ def load_init_data_online() -> dict:
     zombies = []
     player_x, player_y = [int(i) for i in input().split()]
     human_count = int(input())
-    player = Player(0, (player_x, player_y), (0, 0))
+    player = Player(0, Point(player_x, player_y), Point(0, 0))
     for i in range(human_count):
         human_id, human_x, human_y = [int(j) for j in input().split()]
-        humans.append(Character(human_id, (human_x, human_y), (0, 0)))
+        humans.append(Character(human_id, Point(human_x, human_y), Point(0, 0)))
     zombie_count = int(input())
     for i in range(zombie_count):
         zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = [int(j) for j in input().split()]
-        zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
+        zombies.append(Zombie(zombie_id, Point(zombie_x, zombie_y), Point(zombie_x_next, zombie_y_next)))
     return dict(player=player, humans=humans, zombies=zombies)
+
+
+def dist(p: Point, q: Point) -> float:
+    return math.sqrt((p.x - q.x) ** 2.0 + (p.y - q.y) ** 2.0)
 
 
 @timeit
@@ -51,15 +54,15 @@ def load_init_data_offline() -> dict:
     zombies = []
     with open(path, 'r+') as data:
         x, y = map(int, data.readline().split())
-        player = Player(0, (x, y), (x, y))
+        player = Player(0, Point(x, y), Point(x, y))
         human_count = int(data.readline())
         for i in range(human_count):
             human_id, human_x, human_y = map(int, data.readline().split())
-            humans.append(Character(human_id, (human_x, human_y), (human_x, human_y)))
+            humans.append(Character(human_id, Point(human_x, human_y), Point(human_x, human_y)))
         zombie_count = int(data.readline())
         for i in range(zombie_count):
             zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = map(int, data.readline().split())
-            zombies.append(Zombie(zombie_id, (zombie_x, zombie_y), (zombie_x_next, zombie_y_next)))
+            zombies.append(Zombie(zombie_id, Point(zombie_x, zombie_y), Point(zombie_x_next, zombie_y_next)))
     return dict(player=player, humans=humans, zombies=zombies)
 
 
@@ -67,7 +70,7 @@ def load_init_data_offline() -> dict:
 def generate_init_population(init_data, count: int) -> List[GameState]:
     population = []
     for id in range(count):
-        population.append(GameState(id, init_data, 0))
+        population.append(GameState(id, init_data))
     return population
 
 
@@ -122,13 +125,12 @@ def report_single_game(game: GameState):
     print(f'{game.humans[1].turn_death=}')
 
 
-
 # TODO: formula for score calc is already in 2 places, consider moving it out
 def calc_max_possible_score(human_cnt: int, zombie_cnt: int) -> float:
-    sum = 0
+    sum_ = 0
     for nth_zombie_killed in range(zombie_cnt + 1):
-        sum += (math.sqrt(human_cnt) * 10) * KILL_MODIFIER[nth_zombie_killed]
-    return sum
+        sum_ += (math.sqrt(human_cnt) * 10) * KILL_MODIFIER[nth_zombie_killed]
+    return sum_
 
 # 1 genome = 1 round == X turns
 # 1 population = X genomes/ rounds
