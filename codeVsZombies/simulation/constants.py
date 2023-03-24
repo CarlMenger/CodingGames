@@ -11,3 +11,7 @@ PLAYER_RANGE = 2000
 
 # Distance to kill npc humans. If distance to npc <= range, zombie is killed.
 ZOMBIE_RANGE = 400
+
+# Board size
+BOARD_X_MAX = 16000
+BOARD_Y_MAX = 9000

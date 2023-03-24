@@ -1,6 +1,6 @@
 from cVSz_classes import GameState
 import matplotlib.pyplot as plt
-from constants import PLAYER_RANGE, ZOMBIE_RANGE
+from constants import PLAYER_RANGE, ZOMBIE_RANGE, BOARD_X_MAX, BOARD_Y_MAX
 
 
 # TODO: Make this able to take GS in any state and visualize up to that point, being able to save
@@ -8,13 +8,13 @@ from constants import PLAYER_RANGE, ZOMBIE_RANGE
 # TODO: turn by turn visualization?
 
 
-def visualize_turn(gs: GameState):
+def visualize_game(gs: GameState):
     #  =========== Init settings ===========
     plt.title = f'Score: {gs.score}'
     plt.xlabel('X')
     plt.ylabel('Y')
-    plt.xlim(0, 16000)
-    plt.ylim(0, 9000)
+    plt.xlim(0, BOARD_X_MAX)
+    plt.ylim(0, BOARD_Y_MAX)
 
     # ====================== Zombies ======================
     for z in gs.zombies:

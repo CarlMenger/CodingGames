@@ -1,8 +1,8 @@
 import math
 import random
 from typing import List
-from constants import PLAYER_RANGE, ZOMBIE_RANGE, KILL_MODIFIER
 
+from constants import PLAYER_RANGE, ZOMBIE_RANGE, KILL_MODIFIER
 
 
 # TODO: Start using Point class
@@ -25,13 +25,18 @@ class Point:
 
 
 class GameState:
-    __slots__ = ('id', 'player', 'humans', 'zombies', 'score', 'score_decision', 'turn', 'active', 'state',)
+    __slots__ = (
+        'id', 'player', 'humans', 'zombies', 'human_cnt_max', 'zombie_cnt_max', 'score', 'score_decision', 'turn',
+        'active',
+        'state',)
 
-    def __init__(self, id, init_data,):
+    def __init__(self, id, init_data, ):
         self.id = id
         self.player: Player = init_data['player']
         self.humans: List[Character] = init_data['humans']
         self.zombies: List[Zombie] = init_data['zombies']
+        self.human_cnt_max = len(self.humans)
+        self.zombie_cnt_max = len(self.zombies)
 
         self.score: int = 0  # Actual score, set as -1 on game loss
         self.score_decision: float = 0  # Output of scoring function for gene selection
@@ -48,17 +53,16 @@ class GameState:
                f'Turn: {self.turn},\t' \
                f'State: {self.state},\t'
 
-    def generate_random_move(self):
-        return Point(random.randint(0, 16000), random.randint(0, 9000))
-
-    # TODO: this should be moved and have a way to change strategy of how to generate player moves
-    def resolve_game(self, mode='random'):
+    def resolve_game(self, mode='previous_best'):
+        from codeVsZombies.simulation.cVSz_funcs import generate_random_move
         while self.active:
-            self.turn += 1
-            player_move = self.generate_random_move()
+            # At default, player moves randomly
+            player_move = generate_random_move()
+            # or use predefined moves up to certain turn
+            if mode == 'previous_best' and self.turn < len(self.player.move_future):
+                player_move = self.player.move_future[self.turn]
             self.resolve_turn(player_move)
-
-            # print(self)
+            self.turn += 1
 
     def resolve_turn(self, player_move):
         """
@@ -79,7 +83,8 @@ class GameState:
 
         self.update_score()
 
-    # MOVEMENT
+        # MOVEMENT
+
     def player_move2next_point(self):
         self.player.move_history.append(self.player.point_current)  # Save current point
         self.player.point_next = self.get_point_next(self.player.point_current, self.player.point_next, PLAYER_RANGE)
@@ -88,7 +93,8 @@ class GameState:
     def set_player_next_move(self, next_point: tuple) -> None:
         self.player.point_next = next_point
 
-    # FIXME: kill everything in path, not just on arrival?
+        # FIXME: kill everything in path, not just on arrival?
+
     def zombies_find_next_target(self):
         # check if zombie is alive --> move all zombie funcs after zombie is alive condition
         # need to recheck target validity each turn, player moving around might change it
@@ -108,6 +114,13 @@ class GameState:
             zombie.point_current = zombie.point_next  # Current point = Next point
 
     def get_point_next(self, source_point: Point, target_point: Point, range: int) -> Point:
+        """
+        Get next point on path to target_point, with given range.
+        :param source_point:
+        :param target_point:
+        :param range:
+        :return:
+        """
         # FIXME: rounding might cause slight overshooting (+0.4122875237472)
         from cVSz_funcs import dist
         x1, y1 = source_point.x, source_point.y
@@ -121,7 +134,7 @@ class GameState:
         y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
         return Point(round(x3, 2), round(y3, 2))
 
-    # KILLING
+        # KILLING
 
     def player_kill(self):
         from cVSz_funcs import dist
@@ -176,7 +189,7 @@ class GameState:
     def get_alive_humans(self):
         return [human for human in self.humans if human.alive]
 
-    def check_game_status(self, print_status=False):
+    def check_game_status(self):
         """
         If all humans or all zombies are dead
         """
@@ -184,13 +197,11 @@ class GameState:
         if not self.get_alive_zombies():
             self.active = False
             self.state = 1
-            # print('Game Over: Win')
+            # Win
         if not self.get_alive_humans():
             self.active = False
             self.state = -1
-            # print('Game Over: Loss')
-        # quit()
-        # return False
+            # Loss
 
     # def fitting_score(self):
     #     """ Calc score to fit given gene (player move)
@@ -237,6 +248,7 @@ class Player(Character):
 
     def __init__(self: super, id: int, point_current: Point, point_next: Point):
         super().__init__(id, point_current, point_next)
+        self.move_future: List[Point] = []
 
     def set_next_move(self, next_move: Point):
         self.point_next = next_move
