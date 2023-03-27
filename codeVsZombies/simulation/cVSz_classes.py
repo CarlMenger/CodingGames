@@ -1,11 +1,9 @@
 import math
-import random
 from typing import List
 
 from constants import PLAYER_RANGE, ZOMBIE_RANGE, KILL_MODIFIER
 
 
-# TODO: Start using Point class
 class Point:
     def __init__(self, x: float, y: float) -> None:
         self.x = x
@@ -54,26 +52,30 @@ class GameState:
                f'State: {self.state},\t'
 
     def resolve_game(self, mode='previous_best'):
-        from codeVsZombies.simulation.cVSz_funcs import generate_random_move
+        from codeVsZombies.simulation.cVSz_funcs import generate_random_move, get_point_next
         while self.active:
+            self.turn += 1
+            # --- Decide player move ---
             # At default, player moves randomly
-            player_move = generate_random_move()
+            random_point = generate_random_move()
+            player_move = get_point_next(self.player.point_current, random_point, PLAYER_RANGE)
             # or use predefined moves up to certain turn
             if mode == 'previous_best' and self.turn < len(self.player.move_future):
                 player_move = self.player.move_future[self.turn]
-            self.resolve_turn(player_move)
-            self.turn += 1
 
-    def resolve_turn(self, player_move):
+            self.player.point_next = player_move
+            # --- resolve turn ---
+            self.resolve_turn()
+
+    def resolve_turn(self):
         """
         Simulate single turn. Update movements directions. Move player, move zombies. Kill.
         Check game status. Update Score.
         """
         # Moving
-        self.set_player_next_move(player_move)
         self.zombies_find_next_target()  # zombies can be init with no next target
-        self.zombies_move2next_point()
-        self.player_move2next_point()
+        self.zombies_move()
+        self.player_move()
 
         # Killing
         self.player_kill()
@@ -83,75 +85,41 @@ class GameState:
 
         self.update_score()
 
-        # MOVEMENT
+    def player_move(self):
+        self.player.move_to_next_point()
 
-    def player_move2next_point(self):
-        self.player.move_history.append(self.player.point_current)  # Save current point
-        self.player.point_next = self.get_point_next(self.player.point_current, self.player.point_next, PLAYER_RANGE)
-        self.player.point_current = self.player.point_next
-
-    def set_player_next_move(self, next_point: tuple) -> None:
-        self.player.point_next = next_point
-
-        # FIXME: kill everything in path, not just on arrival?
-
+    # FIXME: kill everything in path, not just on arrival?
     def zombies_find_next_target(self):
+        from codeVsZombies.simulation.cVSz_funcs import get_point_next, find_nearest_character
         # check if zombie is alive --> move all zombie funcs after zombie is alive condition
         # need to recheck target validity each turn, player moving around might change it
         for zombie in self.get_alive_zombies():
             assert zombie is not None, 'Unlive zombie looking for target!'
             # check target status from last round (not killed this or previous rounds)
-            target = self.find_nearest_character(zombie)  # Find target
+            target = find_nearest_character(zombie, self.get_alive_humans() + [self.player])  # Find target
             assert isinstance(target, Character), 'Wrong/No target found for zombie!'
-            zombie.target_point = target.point_current  #
+            zombie.target_point = target.point_current
             zombie.target_id = target.id
-            zombie.point_next = self.get_point_next(zombie.point_current, zombie.target_point,
-                                                    ZOMBIE_RANGE)  # Set path to target
+            zombie.point_next = get_point_next(zombie.point_current,
+                                               zombie.target_point,
+                                               ZOMBIE_RANGE)  # Set path to target
 
-    def zombies_move2next_point(self):
+    def zombies_move(self):
         for zombie in self.get_alive_zombies():
-            zombie.move_history.append(zombie.point_current)  # Save current point
-            zombie.point_current = zombie.point_next  # Current point = Next point
-
-    def get_point_next(self, source_point: Point, target_point: Point, range: int) -> Point:
-        """
-        Get next point on path to target_point, with given range.
-        :param source_point:
-        :param target_point:
-        :param range:
-        :return:
-        """
-        # FIXME: rounding might cause slight overshooting (+0.4122875237472)
-        from cVSz_funcs import dist
-        x1, y1 = source_point.x, source_point.y
-        x2, y2 = target_point.x, target_point.y
-        if range > dist(source_point, target_point):  # Prevent overshooting
-            return target_point
-        distance = dist(source_point, target_point)
-        r = range / distance  # segment ratio
-
-        x3 = r * x2 + (1 - r) * x1  # find point that divides the segment
-        y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
-        return Point(round(x3, 2), round(y3, 2))
-
-        # KILLING
+            zombie.move_to_next_point()
 
     def player_kill(self):
         from cVSz_funcs import dist
         for zombie in self.get_alive_zombies():
             if dist(self.player.point_current, zombie.point_current) <= PLAYER_RANGE:
-                zombie.alive = False
-                zombie.turn_death = self.turn
+                zombie.die(self.turn)
 
     def zombies_kill(self):
         from cVSz_funcs import dist
-        assert self.zombies and self.humans, 'No zombies alive or no humans alive!'
         for zombie in self.get_alive_zombies():
             for human in self.humans:
-                assert isinstance(zombie, Zombie) and isinstance(human, Character), ''
                 if dist(zombie.point_current, human.point_current) <= ZOMBIE_RANGE:
-                    human.alive = False
-                    human.turn_death = self.turn
+                    human.die(self.turn)
 
     def update_score(self):
         # Loss
@@ -159,29 +127,12 @@ class GameState:
             self.score = -1
         else:
             humans_alive_cnt = len(self.get_alive_humans())
-            assert humans_alive_cnt > 0, f'[Error] Scoring with {humans_alive_cnt} humans left'
+            assert humans_alive_cnt > 0, f'[Error] Trying to assign positive score with {humans_alive_cnt} humans left'
 
             zombies_dead_this_turn_cnt = len(
                 [zombie for zombie in self.zombies if not zombie.alive and zombie.turn_death == self.turn])
             if zombies_dead_this_turn_cnt > 0:
                 self.score += (math.sqrt(humans_alive_cnt) * 10) * KILL_MODIFIER[zombies_dead_this_turn_cnt]
-
-    def get_human_by_id(self, id):
-        for human in self.humans:
-            if human.id == id:
-                return human
-
-    def find_nearest_character(self, zombie):
-        from cVSz_funcs import dist
-        assert zombie.alive, 'Non-alive zombie looking for target'
-        dist_min = 99999
-        h = None
-        for human in self.get_alive_humans() + [self.player]:
-            distance = dist(zombie.point_current, human.point_current)
-            if distance < dist_min:
-                dist_min = distance
-                h = human
-        return h
 
     def get_alive_zombies(self):
         return [zombie for zombie in self.zombies if zombie.alive]
@@ -191,7 +142,7 @@ class GameState:
 
     def check_game_status(self):
         """
-        If all humans or all zombies are dead
+        If all humans or all zombies are dead, end the game.
         """
 
         if not self.get_alive_zombies():
@@ -202,17 +153,6 @@ class GameState:
             self.active = False
             self.state = -1
             # Loss
-
-    # def fitting_score(self):
-    #     """ Calc score to fit given gene (player move)
-    #         features::
-    #         score/killed zombies
-    #         humans left
-    #         score potential? (max possible point to earn)
-    #         current score?
-    #
-    #     """
-    #     pass
 
     # def avg_dist_change(self):
     #     """ Average change in distance between Player and All alive zombies.
@@ -242,6 +182,15 @@ class Character:
 
     def __str__(self) -> str:
         return f'{type(self)}, ID: {self.id} at: {self.point_current.x}, {self.point_current.y}'
+
+    def die(self, turn: int):
+        self.alive = False
+        self.turn_death = turn
+
+    def move_to_next_point(self):
+        self.move_history.append(self.point_current)
+        self.point_current = self.point_next
+        # TODO: set next_point to None?
 
 
 class Player(Character):

@@ -15,3 +15,8 @@ ZOMBIE_RANGE = 400
 # Board size
 BOARD_X_MAX = 16000
 BOARD_Y_MAX = 9000
+
+
+
+# 1 genome = 1 round == X turns
+# 1 population = X genomes/ rounds

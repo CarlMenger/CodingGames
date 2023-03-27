@@ -67,6 +67,7 @@ def load_init_data_offline() -> dict:
     return dict(player=player, humans=humans, zombies=zombies)
 
 
+# TODO: generate_init_population ---> generate_blank_population
 @timeit
 def generate_init_population(init_data, count: int) -> List[GameState]:
     population = []
@@ -78,58 +79,61 @@ def generate_init_population(init_data, count: int) -> List[GameState]:
 # TODO: should be method of GameState, parametrize debug/ or make Simulation class and allow for different scenarios
 # TODO: keep GameState as class, but make it DataClass. GameState.increment_turn()
 # TODO: make debug as Debugger Class
-# TODO: make 'move' a Point class
 # TODO: make simulation Class?
 # TODO: generate implies Generator, change name?
 @timeit
 def generate_population_from_selected_performers(selected_performers: List[GameState],
-                                                 gene_cnt: int,
+                                                 population_size: int,
                                                  generation_num: int) -> List[GameState]:
     """
     Generate new population of GameStates based on selected performers from previous population.
     Take move history up to generation number from selected performers and assign it evenly to new population as move_future.
     :param selected_performers: List of GameStates that will be used to generate new population.
-    :param gene_cnt: Number of genes in population.
+    :param population_size: Number of genes in population.
     :param generation_num: Number of generation. Used to determine how many moves from start to take from selected_performers.
     :return: List of new GameStates.
     """
-    population = generate_init_population(load_init_data_offline(), gene_cnt)
+    population = generate_init_population(load_init_data_offline(), population_size)
     for i in range(len(population)):
         index: int = i % len(selected_performers)
         population[i].player.move_future = selected_performers[index].player.move_history[:generation_num + 1]
     return population
 
 
-def simulate_evolution(gene_cnt: int, top_performers_ratio: float, performers_survive_cnt: int, debug=False):
+def simulate_evolution(population_size: int, top_performers_ratio: float, performers_survive_cnt: int, debug=True):
     """
     Simulate evolution of population of GameStates. Each evolution step consists of:
     1. Generate initial population of GameStates
-    2. Do selection by getting top performers and random performers
-    :param gene_cnt: Number of genes in population.
-    :param top_performers_ratio: Ratio of top performers to be selected.
-    :param performers_survive_cnt: Total number of performers to be selected.
+    2. Do parent selection by getting top performers and random performers
+    3. Use move_history of selected performers to guide first X moves of new population
+    4. Repeat
+    :param population_size: Number of genes in population.
+    :param top_performers_ratio: Ratio of the best performers to be selected as parents for next generation.
+    :param performers_survive_cnt: Total number of performers to be selected as parents for next generation.
     :param debug:
     :return:
     """
+
+    assert population_size >= performers_survive_cnt, "Population size must be greater or equal to performers_survive_cnt"
     best_of = []
 
     # Generate initial population of GameStates
-    population = generate_init_population(load_init_data_offline(), gene_cnt)
+    population = generate_init_population(load_init_data_offline(), population_size)
     population = simulate_population(population)
     best_of.extend(get_top_performers(population, 1))
 
-    for generation in range(100):
+    for generation in range(50):
         # Get top performers
-        top_performers_cnt = int(gene_cnt * top_performers_ratio)
+        top_performers_cnt = int(performers_survive_cnt * top_performers_ratio)
         selected_performers = get_top_performers(population, top_performers_cnt)
-        # Get random performer up to performers_survive_cnt
+        # Fill the new population with random performers up to a limit given by performers_survive_cnt
         while len(selected_performers) < performers_survive_cnt:
             random_performer = get_random_performer(population)
             if random_performer not in selected_performers:
                 selected_performers.append(random_performer)
 
         # Generate new population
-        population = generate_population_from_selected_performers(selected_performers, gene_cnt, generation)
+        population = generate_population_from_selected_performers(selected_performers, population_size, generation)
         population = simulate_population(population)
 
         # Save the best performer
@@ -198,8 +202,13 @@ def report_single_game(game: GameState):
     """
     Report basic statistics on a single GameState:
     """
-    print(f'Result: {game.state}')
-    print(f'Turns num: {len(game.player.move_history)}')
+    print(f'Game active: {game.active}')
+    print(f'Game state: {game.state}')
+    print(f'Player move_history_cnt: {len(game.player.move_history)}')
+    print(f'Player move_future_cnt: {len(game.player.move_future)}')
+    print(f'Game turn: {game.turn}')
+    print(f'Player move_history: {game.player.move_history}')
+    print(f'Player move_future: {game.player.move_future}')
 
     # Zombie deaths
     for zombie_id, zombie in enumerate(game.zombies):
@@ -225,7 +234,38 @@ def calc_max_possible_score(human_cnt: int, zombie_cnt: int) -> float:
 def generate_random_move():
     return Point(random.randint(0, BOARD_X_MAX), random.randint(0, BOARD_Y_MAX))
 
-# 1 genome = 1 round == X turns
-# 1 population = X genomes/ rounds
 
 # TODO: Save top performers for analysis (as player.move_history)
+
+def get_point_next(source_point: Point, target_point: Point, max_range: int) -> Point:
+    """
+    Get next point on path to target_point, within given range.
+    :param source_point:
+    :param target_point:
+    :param max_range:
+    :return:
+    """
+    # FIXME: rounding might cause slight overshooting (+0.4122875237472)
+    x1, y1 = source_point.x, source_point.y
+    x2, y2 = target_point.x, target_point.y
+    if max_range > dist(source_point, target_point):  # Prevent overshooting
+        return target_point
+    distance = dist(source_point, target_point)
+    r = max_range / distance  # segment ratio
+
+    x3 = r * x2 + (1 - r) * x1  # find point that divides the segment
+    y3 = r * y2 + (1 - r) * y1  # into the ratio (1-r):r
+    return Point(round(x3, 2), round(y3, 2))
+
+
+def find_nearest_character(hunter, prays: List):
+    assert hunter.alive, f'Non-alive {type(hunter)} looking for target'
+    assert prays, f'No pray to hunt'
+    dist_min = 99999
+    final_pray = None
+    for pray in prays:
+        distance = dist(hunter.point_current, pray.point_current)
+        if distance < dist_min:
+            dist_min = distance
+            final_pray = pray
+    return final_pray

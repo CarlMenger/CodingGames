@@ -7,7 +7,10 @@ from visualization import visualize_game
 
 @timeit
 def main():
-    simulate_evolution(gene_cnt=100, top_performers_ratio=0.5, performers_survive_cnt=20,)
+    simulate_evolution(population_size=19,
+                       top_performers_ratio=0.5,
+                       performers_survive_cnt=20,
+                       )
 
     # TODO: Move all this to separate function
     # NTB
