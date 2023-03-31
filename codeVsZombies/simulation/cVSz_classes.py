@@ -24,9 +24,9 @@ class Point:
 
 class GameState:
     __slots__ = (
-        'id', 'player', 'humans', 'zombies', 'human_cnt_max', 'zombie_cnt_max', 'score', 'score_decision', 'turn',
-        'active',
-        'state',)
+        'id', 'player', 'humans', 'zombies', 'human_cnt_max', 'zombie_cnt_max', 'score', 'score_decision',
+        'turn', 'active', 'state',
+    )
 
     def __init__(self, id, init_data, ):
         self.id = id
@@ -51,16 +51,19 @@ class GameState:
                f'Turn: {self.turn},\t' \
                f'State: {self.state},\t'
 
-    def resolve_game(self, mode='previous_best'):
+    def resolve_game(self, strategy='previous_best'):
         from codeVsZombies.simulation.cVSz_funcs import generate_random_move, get_point_next
         while self.active:
             self.turn += 1
             # --- Decide player move ---
+            # if last zombie alive, move to it
+            # TODO: move to nearest zombie
+
             # At default, player moves randomly
             random_point = generate_random_move()
             player_move = get_point_next(self.player.point_current, random_point, PLAYER_RANGE)
             # or use predefined moves up to certain turn
-            if mode == 'previous_best' and self.turn < len(self.player.move_future):
+            if strategy == 'previous_best' and self.turn < len(self.player.move_future):
                 player_move = self.player.move_future[self.turn]
 
             self.player.point_next = player_move
@@ -144,29 +147,87 @@ class GameState:
         """
         If all humans or all zombies are dead, end the game.
         """
-
+        # Win
         if not self.get_alive_zombies():
             self.active = False
             self.state = 1
-            # Win
+
+        # Loss
         if not self.get_alive_humans():
             self.active = False
             self.state = -1
-            # Loss
 
-    # def avg_dist_change(self):
-    #     """ Average change in distance between Player and All alive zombies.
-    #         Potential feature for fitting func.
-    #     ++ is good
-    #     -- is bad
-    #     """
-    #     dist0 = 0  # Total dist to current point
-    #     dist1 = 0  # Total dist to next point
-    #     for z in self.get_alive_zombies():
-    #         dist0 += dist(self.player.point_current, z.point_current)
-    #         dist1 += dist(self.player.point_next, z.point_current)
-    #     dist_diff = dist0 - dist1
-    #     return dist_diff / len(self.get_alive_zombies())
+    def report(self, visualize=True):
+        from codeVsZombies.simulation.cVSz_funcs import calc_max_possible_score
+        from codeVsZombies.simulation.visualization import visualize_game
+
+        print(f'Game active: {self.active}')
+        print(f'Game state: {self.state}')
+        print(f'Player move_history_cnt: {len(self.player.move_history)}')
+        print(f'Player move_future_cnt: {len(self.player.move_future)}')
+        print(f'Game turn: {self.turn}')
+        print(f'Player move_history: {self.player.move_history}')
+        print(f'Player move_future: {self.player.move_future}')
+        print(f'Max score: {calc_max_possible_score()}')
+        print(f'Score: {self.score}')
+
+        # Zombie deaths
+        for zombie_id, zombie in enumerate(self.zombies):
+            print(f'Zombie {zombie_id} turn_death: {zombie.turn_death}')
+
+        # Human death
+        for human_id, human in enumerate(self.humans):
+            print(f'Human {human_id} turn_death: {human.turn_death}')
+
+        # Visualize
+        if visualize:
+            visualize_game(self)
+
+
+class Population:
+    def __init__(self, generation: int, game_states: List[GameState]):
+        self.generation = generation
+        self.game_states = game_states
+        self.score_max = None  # TODO: make default -1?
+        self.score_avg = None  # TODO: make default -1?
+
+    def __repr__(self):
+        return f"""
+            Count       : {self.__len__()}
+            Generation  : {self.generation}
+            Best score  : {self.score_max}
+            Avg score   : {self.score_avg}
+            """
+
+    def __len__(self):
+        return len(self.game_states)
+
+    def get_best_game_states(self, count=1):
+        best_game_states = sorted([game_state for game_state in self.game_states if game_state.score > 0],
+                                  key=lambda x: (x.score, len(x.get_alive_humans())), reverse=True)
+        return best_game_states[:count]
+
+    def set_score_max(self):
+        self.score_max = max([game_state.score for game_state in self.game_states])
+
+    def set_score_avg(self):
+        self.score_avg = sum([game_state.score for game_state in self.game_states]) / len(self.game_states)
+
+    def add_game_states(self, game_states: List[GameState]):
+        self.game_states.extend(game_states)
+
+    def simulate(self, strategy='previous_best'):
+        for game_state in self.game_states:
+            game_state.resolve_game(strategy=strategy)
+
+    def report(self):
+        self.set_score_max()
+        self.set_score_avg()
+        from codeVsZombies.simulation.cVSz_funcs import calc_max_possible_score
+        print(f"================================================================================")
+        # print(f'Max possible score: {calc_max_possible_score()}')
+        print(self)
+        print(f"================================================================================")
 
 
 class Character:
@@ -190,7 +251,7 @@ class Character:
     def move_to_next_point(self):
         self.move_history.append(self.point_current)
         self.point_current = self.point_next
-        # TODO: set next_point to None?
+        self.point_next = None  # TODO: Remove this line?
 
 
 class Player(Character):
