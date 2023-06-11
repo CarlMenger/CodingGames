@@ -1,16 +1,17 @@
 import math
+import platform
 import random
 import time
 from functools import wraps
 from typing import List
+import copy
 
 from cVSz_classes import GameState, Player, Character, Zombie, Point, Population
-from constants import KILL_MODIFIER, BOARD_X_MAX, BOARD_Y_MAX
+from constants import BOARD_X_MAX, BOARD_Y_MAX
 
 path = 'input.txt'
 
-global human_cnt_max
-global zombie_cnt_max
+global max_possible_score
 
 
 def timeit(my_func):
@@ -25,33 +26,46 @@ def timeit(my_func):
     return timed
 
 
+# def calc_max_possible_score(human_cnt_max, zombie_cnt_max) -> float:
+#     sum_ = 0
+#     for nth_zombie_killed in range(zombie_cnt_max + 1):
+#         sum_ += (math.sqrt(human_cnt_max) * 10) * KILL_MODIFIER[nth_zombie_killed]
+#     return sum_
+
+
+@timeit
+def load_data():
+    # NTB
+    if platform.node() in ('CZ-L1132', 'DESKTOP-JK8TMGJ'):
+        return load_init_data_offline()
+    else:
+        return load_init_data_online()
+
+
 def load_init_data_online() -> dict:
     """
-    Load data in online environment for a actual validation.
+    Load data in an online environment for actual code testing.
     """
     humans = []
     zombies = []
-    global human_cnt_max
-    global zombie_cnt_max
 
     # Player
     player_x, player_y = [int(i) for i in input().split()]
 
     # Humans
-    human_count = int(input())
-    human_cnt_max = human_count
+    human_cnt_max = int(input())
     player = Player(0, Point(player_x, player_y), Point(0, 0))
-    for i in range(human_count):
+    for i in range(human_cnt_max):
         human_id, human_x, human_y = [int(j) for j in input().split()]
         humans.append(Character(human_id, Point(human_x, human_y), Point(0, 0)))
 
     # Zombies
-    zombie_count = int(input())
-    zombie_cnt_max = zombie_count
-    for i in range(zombie_count):
+    zombie_cnt_max = int(input())
+    for i in range(zombie_cnt_max):
         zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = [int(j) for j in input().split()]
         zombies.append(Zombie(zombie_id, Point(zombie_x, zombie_y), Point(zombie_x_next, zombie_y_next)))
 
+    # max_possible_score = calc_max_possible_score(human_cnt_max, zombie_cnt_max)
     return dict(player=player, humans=humans, zombies=zombies)
 
 
@@ -66,33 +80,35 @@ def load_init_data_offline() -> dict:
     """
     humans = []
     zombies = []
-    global human_cnt_max
-    global zombie_cnt_max
+
     with open(path, 'r+') as data:
         # Player
         x, y = map(int, data.readline().split())
         player = Player(0, Point(x, y), Point(x, y))
 
         # Humans
-        human_count = int(data.readline())
-        human_cnt_max = human_count
-        for i in range(human_count):
+        human_cnt_max = int(data.readline())
+        for i in range(human_cnt_max):
             human_id, human_x, human_y = map(int, data.readline().split())
             humans.append(Character(human_id, Point(human_x, human_y), Point(human_x, human_y)))
 
         # Zombies
-        zombie_count = int(data.readline())
-        zombie_cnt_max = zombie_count
-        for i in range(zombie_count):
+        zombie_cnt_max = int(data.readline())
+        for i in range(zombie_cnt_max):
             zombie_id, zombie_x, zombie_y, zombie_x_next, zombie_y_next = map(int, data.readline().split())
             zombies.append(Zombie(zombie_id, Point(zombie_x, zombie_y), Point(zombie_x_next, zombie_y_next)))
+
     return dict(player=player, humans=humans, zombies=zombies)
 
 
-# @timeit # "generate_blank_population" took 0.000 ms to execute
-def generate_blank_population(init_data, count: int) -> Population:
-    game_states = [GameState(id, init_data) for id in range(count)]
-    return Population(generation=0, game_states=game_states)
+@timeit  # "generate_blank_population" took 0.000 ms to execute
+def generate_blank_population(count: int, generation_id=0) -> Population:
+    init_data = load_data()
+    game_states = []
+    for n in range(count):
+        init_data = copy.deepcopy(init_data)
+        game_states.append(GameState(n, generation_id, init_data))
+    return Population(generation_id, game_states=game_states)
 
 
 # FIXME: Make sure gene_cnt is doing what it is suppose to do.
@@ -102,19 +118,21 @@ def generate_blank_population(init_data, count: int) -> Population:
 # @timeit "create_population_from_selected_performers" took 0.000 ms to execute
 def create_population_from_selected_performers(parent_pop: List[GameState],
                                                population_size: int,
-                                               gene_cnt: int) -> Population:
+                                               gene_crossover_cnt: int,
+                                               generation_id: int) -> Population:
     """
     Generate new population of GameStates based on selected performers.
     Take move history up to given turn number from selected performers and assign it evenly to new population as move_future.
     :param parent_pop: Population that will be used to generate new population.
     :param population_size: Number of genes in population.
-    :param gene_cnt: Number of turns to be taken from move_history of selected performers and assigned to new population as move_future.
+    :param gene_crossover_cnt: Number of turns to be taken from move_history of selected performers and assigned to new population as move_future.
+    :param generation_id: ID of generation to be assigned to new population.
     :return: List of new GameStates.
     """
-    new_pop: Population = generate_blank_population(load_init_data_offline(), population_size)
+    new_pop: Population = generate_blank_population(population_size, generation_id)
     for i in range(len(new_pop)):
         index: int = i % len(parent_pop)
-        new_pop.game_states[i].player.move_future = parent_pop[index].player.move_history[:gene_cnt + 1]
+        new_pop.game_states[i].player.move_future = parent_pop[index].player.move_history[:gene_crossover_cnt + 1]
     return new_pop
 
 
@@ -137,6 +155,13 @@ def simulate_evolution(population_size: int,
     """
     top_performers_cnt = int(performers_survive_cnt * top_performers_ratio)
 
+    # Do input checks
+    assert top_performers_ratio <= 1.0, f"top_performers_ratio must be <= 1.0, got {top_performers_ratio}"
+    assert top_performers_ratio > 0.0, f"top_performers_ratio must be > 0.0, got {top_performers_ratio}"
+    assert performers_survive_cnt > 0, f"performers_survive_cnt must be > 0, got {performers_survive_cnt}"
+    assert generation_cnt >= 0, f"generation_cnt must be > 0, got {generation_cnt}"
+    assert population_size > 0, f"population_size must be > 0, got {population_size}"
+
     if population_size < performers_survive_cnt:
         population_size = performers_survive_cnt
         print(
@@ -144,12 +169,12 @@ def simulate_evolution(population_size: int,
             f"Setting population_size to {performers_survive_cnt}.")
 
     # Generation 0: selected_performers == initial_population
-    population = generate_blank_population(load_init_data_offline(), population_size)
+    population = generate_blank_population(population_size, generation_id=0)
     population.simulate()
-    best_of: Population = Population(generation=0, game_states=population.get_best_game_states(top_performers_cnt))
+    best_of: Population = Population(generation_id=0, game_states=population.get_best_game_states(top_performers_cnt))
 
     # Generations 1-X
-    for gen_num in range(generation_cnt):
+    for generation_id in range(generation_cnt+1):
         # Select
         selected_performers = best_of.get_best_game_states(top_performers_cnt)
         # Fill the new population with random performers from previous generation up to a limit
@@ -158,15 +183,20 @@ def simulate_evolution(population_size: int,
             if random_performer not in selected_performers:
                 selected_performers.append(random_performer)
 
+        # TODO: :param gene_crossover_cnt this is here if we wanna have multiple generations with different
+        # TODO: crossover genes passed to children than generation id
         # Generate new population
-        population = create_population_from_selected_performers(selected_performers, population_size, gen_num)
+        population = create_population_from_selected_performers(selected_performers,
+                                                                population_size,
+                                                                gene_crossover_cnt=generation_id,
+                                                                generation_id=generation_id)
 
         # Simulate 
         population.simulate()
 
         # Save the best
         best_of.add_game_states(population.get_best_game_states(top_performers_cnt))
-        best_of.generation = gen_num
+        best_of.generation = generation_id  # TODO: wtf is this?
 
     best_of.report()
 
@@ -176,22 +206,20 @@ def get_random_performer(population: Population) -> GameState:
 
 
 # TODO: formula for score calc is already in 2 places, consider moving it out
-def calc_max_possible_score() -> float:
-    global human_cnt_max
-    global zombie_cnt_max
-    sum_ = 0
-    for nth_zombie_killed in range(zombie_cnt_max + 1):
-        sum_ += (math.sqrt(human_cnt_max) * 10) * KILL_MODIFIER[nth_zombie_killed]
-    return sum_
 
-
-def generate_random_move():
-    return Point(random.randint(0, BOARD_X_MAX), random.randint(0, BOARD_Y_MAX))
+def generate_random_move(x_min=0, x_max=BOARD_X_MAX, y_min=0, y_max=BOARD_Y_MAX, ):
+    assert x_min <= x_max, "x_min must be <= x_max"
+    assert y_min <= y_max, "y_min must be <= y_max"
+    assert x_min >= 0, "x_min must be >= 0"
+    assert y_min >= 0, "y_min must be >= 0"
+    assert x_max <= BOARD_X_MAX, "x_max must be <= BOARD_X_MAX"
+    assert y_max <= BOARD_Y_MAX, "y_max must be <= BOARD_Y_MAX"
+    return Point(random.randint(x_min, x_max), random.randint(y_min, y_max))
 
 
 # TODO: Save top performers for analysis (as player.move_history)
 
-def get_point_next(source_point: Point, target_point: Point, max_range: int) -> Point:
+def get_point_in_range(source_point: Point, target_point: Point, max_range: int) -> Point:
     """
     Get next point on path to target_point, within given range.
     :param source_point:
@@ -225,7 +253,7 @@ def find_nearest_character(hunter, prays: List):
     return final_pray
 
 
-def dist2targets(self, source, targets) -> List[float]:
+def dist2targets(source, targets) -> List[float]:
     """
     Distance from source to targets.
     """
